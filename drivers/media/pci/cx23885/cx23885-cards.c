@@ -259,6 +259,11 @@ struct cx23885_board cx23885_boards[] = {
 		.name		= "TurboSight TBS 6920",
 		.portb		= CX23885_MPEG_DVB,
 	},
+	[CX23885_BOARD_TBS_6981] = {
+		.name		= "TurboSight TBS 6981",
+		.portb		= CX23885_MPEG_DVB,
+		.portc		= CX23885_MPEG_DVB,
+	},
 	[CX23885_BOARD_TEVII_S470] = {
 		.name		= "TeVii S470",
 		.portb		= CX23885_MPEG_DVB,
@@ -697,6 +702,10 @@ struct cx23885_subid cx23885_subids[] = {
 		.subvendor = 0x6920,
 		.subdevice = 0x8888,
 		.card      = CX23885_BOARD_TBS_6920,
+	}, {
+		.subvendor = 0x6981,
+		.subdevice = 0x8888,
+		.card      = CX23885_BOARD_TBS_6981,
 	}, {
 		.subvendor = 0xd470,
 		.subdevice = 0x9022,
@@ -1224,6 +1233,7 @@ void cx23885_gpio_setup(struct cx23885_dev *dev)
 		cx_set(GP0_IO, 0x00040004);
 		break;
 	case CX23885_BOARD_TBS_6920:
+	case CX23885_BOARD_TBS_6981:
 	case CX23885_BOARD_PROF_8000:
 		cx_write(MC417_CTL, 0x00000036);
 		cx_write(MC417_OEN, 0x00001000);
@@ -1472,6 +1482,7 @@ int cx23885_ir_init(struct cx23885_dev *dev)
 	case CX23885_BOARD_TERRATEC_CINERGY_T_PCIE_DUAL:
 	case CX23885_BOARD_TEVII_S470:
 	case CX23885_BOARD_MYGICA_X8507:
+	case CX23885_BOARD_TBS_6981:
 		if (!enable_885_ir)
 			break;
 		dev->sd_ir = cx23885_find_hw(dev, CX23885_HW_AV_CORE);
@@ -1515,6 +1526,7 @@ void cx23885_ir_fini(struct cx23885_dev *dev)
 	case CX23885_BOARD_TEVII_S470:
 	case CX23885_BOARD_HAUPPAUGE_HVR1250:
 	case CX23885_BOARD_MYGICA_X8507:
+	case CX23885_BOARD_TBS_6981:
 		cx23885_irq_remove(dev, PCI_MSK_AV_CORE);
 		/* sd_ir is a duplicate pointer to the AV Core, just clear it */
 		dev->sd_ir = NULL;
@@ -1560,6 +1572,7 @@ void cx23885_ir_pci_int_enable(struct cx23885_dev *dev)
 	case CX23885_BOARD_TEVII_S470:
 	case CX23885_BOARD_HAUPPAUGE_HVR1250:
 	case CX23885_BOARD_MYGICA_X8507:
+	case CX23885_BOARD_TBS_6981:
 		if (dev->sd_ir)
 			cx23885_irq_add_enable(dev, PCI_MSK_AV_CORE);
 		break;
@@ -1668,6 +1681,7 @@ void cx23885_card_setup(struct cx23885_dev *dev)
 	case CX23885_BOARD_NETUP_DUAL_DVBS2_CI:
 	case CX23885_BOARD_NETUP_DUAL_DVB_T_C_CI_RF:
 	case CX23885_BOARD_TERRATEC_CINERGY_T_PCIE_DUAL:
+	case CX23885_BOARD_TBS_6981:
 		ts1->gen_ctrl_val  = 0xc; /* Serial bus + punctured clock */
 		ts1->ts_clk_en_val = 0x1; /* Enable TS_CLK */
 		ts1->src_sel_val   = CX23885_SRC_SEL_PARALLEL_MPEG_VIDEO;
@@ -1750,6 +1764,7 @@ void cx23885_card_setup(struct cx23885_dev *dev)
 	case CX23885_BOARD_MYGICA_X8507:
 	case CX23885_BOARD_TERRATEC_CINERGY_T_PCIE_DUAL:
 	case CX23885_BOARD_AVERMEDIA_HC81R:
+	case CX23885_BOARD_TBS_6981:
 		dev->sd_cx25840 = v4l2_i2c_new_subdev(&dev->v4l2_dev,
 				&dev->i2c_bus[2].i2c_adap,
 				"cx25840", 0x88 >> 1, NULL);

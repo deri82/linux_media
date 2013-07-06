@@ -51,6 +51,7 @@
 #include "stv6110.h"
 #include "lnbh24.h"
 #include "cx24116.h"
+#include "cx24117.h"
 #include "cimax2.h"
 #include "lgs8gxx.h"
 #include "netup-eeprom.h"
@@ -465,6 +466,10 @@ static struct stv6110_config netup_stv6110_tunerconfig_b = {
 };
 
 static struct cx24116_config tbs_cx24116_config = {
+	.demod_address = 0x55,
+};
+
+static struct cx24117_config tbs_cx24117_config = {
 	.demod_address = 0x55,
 };
 
@@ -1026,6 +1031,21 @@ static int dvb_register(struct cx23885_tsport *port)
 		if (fe0->dvb.frontend != NULL)
 			fe0->dvb.frontend->ops.set_voltage = f300_set_voltage;
 
+		break;
+	case CX23885_BOARD_TBS_6981:
+		i2c_bus = &dev->i2c_bus[1];
+		switch (port->nr) {
+		/* PORT B */
+		case 1:
+			fe0->dvb.frontend = dvb_attach(cx24117_attach,
+						&tbs_cx24117_config,
+						&i2c_bus->i2c_adap, 0);
+		/* PORT A */
+		case 2:
+			fe0->dvb.frontend = dvb_attach(cx24117_attach,
+						&tbs_cx24117_config,
+						&i2c_bus->i2c_adap, 1);
+		}
 		break;
 	case CX23885_BOARD_TEVII_S470:
 		i2c_bus = &dev->i2c_bus[1];
