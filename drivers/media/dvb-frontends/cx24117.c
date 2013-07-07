@@ -338,7 +338,7 @@ static int cx24117_set_symbolrate(struct cx24117_state *state, u32 rate)
 	}
 
 	state->dnxt.symbol_rate = rate;
-	dprintk("%s() demod%d symbol_rate = %d\n", __func__, rate, state->demod);
+	dprintk("%s() demod%d symbol_rate = %d\n", __func__, state->demod, rate);
 
 	return 0;
 }
@@ -402,7 +402,7 @@ static int cx24117_cmd_execute(struct dvb_frontend *fe, struct cx24117_cmd *cmd)
 	struct cx24117_state *state = fe->demodulator_priv;
 	int i, ret;
 
-	dprintk("%s()\n", __func__);
+	dprintk("%s() demod%d\n", __func__, state->demod);
 
 	/* Load the firmware if required */
 	ret = cx24117_firmware_ondemand(fe);
@@ -1313,7 +1313,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 		 * Wait for up to 500 ms before retrying
 		 *
 		 * If we are able to tune then generally it occurs within 100ms.
-		 * If it takes longer, try a different toneburst setting.
+		 * If it takes longer, try a different rolloff setting.
 		 */
 		for (i = 0; i < 50 ; i++) {
 			cx24117_read_status(fe, &tunerstat);
@@ -1332,7 +1332,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			cmd.args[11]--;
 
 	} while (--retune);
-	return i;
+	return -EINVAL;
 tuned:	return 0;
 }
 
