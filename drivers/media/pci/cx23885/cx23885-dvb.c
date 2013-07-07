@@ -1040,11 +1040,13 @@ static int dvb_register(struct cx23885_tsport *port)
 			fe0->dvb.frontend = dvb_attach(cx24117_attach,
 						&tbs_cx24117_config,
 						&i2c_bus->i2c_adap, 0);
+			break;
 		/* PORT A */
 		case 2:
 			fe0->dvb.frontend = dvb_attach(cx24117_attach,
 						&tbs_cx24117_config,
 						&i2c_bus->i2c_adap, 1);
+			break;
 		}
 		break;
 	case CX23885_BOARD_TEVII_S470:
