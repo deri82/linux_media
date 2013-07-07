@@ -1031,6 +1031,40 @@ static void hauppauge_eeprom(struct cx23885_dev *dev, u8 *eeprom_data)
 			dev->name, tv.model);
 }
 
+/* some TBS cards require init */
+static void tbs_card_init(struct cx23885_dev *dev)
+{
+	u8 buf[10];
+	int i;
+	
+	switch (dev->board) {
+	case CX23885_BOARD_TBS_6981:
+		buf[0] = 0xe0;
+		buf[1] = 0x06;
+		buf[2] = 0x66;
+		buf[3] = 0x33;
+		buf[4] = 0x65;
+		buf[5] = 0x01;
+		buf[6] = 0x17;
+		buf[7] = 0x06;
+		buf[8] = 0xde;
+
+		cx_set(GP0_IO, 0x00070007);
+		mdelay(1);
+		cx_clear(GP0_IO, 2);
+		mdelay(1);
+		/* send init bitstream */
+		for (i=0; i<9 * 8; i++) {
+			cx_clear(GP0_IO, 7);
+			udelay(100);
+			cx_set(GP0_IO, ((buf[i >> 3] >> (7 - (i & 7))) & 1) | 4);
+			udelay(100);
+		}
+		cx_set(GP0_IO, 7);
+		break;
+	}
+}
+
 int cx23885_tuner_callback(void *priv, int component, int command, int arg)
 {
 	struct cx23885_tsport *port = priv;
@@ -1681,6 +1715,13 @@ void cx23885_card_setup(struct cx23885_dev *dev)
 	case CX23885_BOARD_NETUP_DUAL_DVBS2_CI:
 	case CX23885_BOARD_NETUP_DUAL_DVB_T_C_CI_RF:
 	case CX23885_BOARD_TERRATEC_CINERGY_T_PCIE_DUAL:
+		ts1->gen_ctrl_val  = 0xc; /* Serial bus + punctured clock */
+		ts1->ts_clk_en_val = 0x1; /* Enable TS_CLK */
+		ts1->src_sel_val   = CX23885_SRC_SEL_PARALLEL_MPEG_VIDEO;
+		ts2->gen_ctrl_val  = 0xc; /* Serial bus + punctured clock */
+		ts2->ts_clk_en_val = 0x1; /* Enable TS_CLK */
+		ts2->src_sel_val   = CX23885_SRC_SEL_PARALLEL_MPEG_VIDEO;
+		break;
 	case CX23885_BOARD_TBS_6981:
 		ts1->gen_ctrl_val  = 0xc; /* Serial bus + punctured clock */
 		ts1->ts_clk_en_val = 0x1; /* Enable TS_CLK */
@@ -1688,6 +1729,7 @@ void cx23885_card_setup(struct cx23885_dev *dev)
 		ts2->gen_ctrl_val  = 0xc; /* Serial bus + punctured clock */
 		ts2->ts_clk_en_val = 0x1; /* Enable TS_CLK */
 		ts2->src_sel_val   = CX23885_SRC_SEL_PARALLEL_MPEG_VIDEO;
+		tbs_card_init(dev);
 		break;
 	case CX23885_BOARD_MYGICA_X8506:
 	case CX23885_BOARD_MAGICPRO_PROHDTVE2:
