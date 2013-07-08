@@ -307,13 +307,12 @@ static int cx24117_lookup_fecmod(struct cx24117_state *state,
 static int cx24117_set_fec(struct cx24117_state *state,
 	fe_delivery_system_t delsys, fe_modulation_t mod, fe_code_rate_t fec)
 {
-	int ret = 0;
+	int ret;
 
 	dprintk("%s(0x%02x,0x%02x) demod%d\n",
 		__func__, mod, fec, state->demod);
 
 	ret = cx24117_lookup_fecmod(state, delsys, mod, fec);
-
 	if (ret < 0)
 		return ret;
 
@@ -1146,7 +1145,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 		break;
 
 	case SYS_DVBS2:
-		dprintk("%s: demof%d DVB-S2 delivery system selected\n",
+		dprintk("%s: demod%d DVB-S2 delivery system selected\n",
 			__func__, state->demod);
 
 		/*
@@ -1188,7 +1187,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			break;
 		case ROLLOFF_AUTO:
 			state->dnxt.rolloff_val = CX24117_ROLLOFF_035;
-			/* soft-auto tolloff */
+			/* soft-auto rolloff */
 			retune = 3;
 			break;
 		default:
@@ -1214,7 +1213,6 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 	if (ret !=  0)
 		return ret;
 
-	/* FEC_NONE/AUTO for DVB-S2 is not supported and detected here */
 	ret = cx24117_set_fec(state, c->delivery_system, c->modulation, c->fec_inner);
 	if (ret !=  0)
 		return ret;
