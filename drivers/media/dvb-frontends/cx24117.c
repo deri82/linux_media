@@ -79,8 +79,8 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 
 /* pilot bit */
 #define CX24117_PILOT_OFF    (0x00)
-#define CX24117_PILOT_AUTO   (0x40)
-#define CX24117_PILOT_ON     (0x80)
+#define CX24117_PILOT_ON     (0x40)
+#define CX24117_PILOT_AUTO   (0x80)
 
 /* signal status */
 #define CX24117_HAS_SIGNAL   (0x01)
@@ -1266,28 +1266,25 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 	cmd.args[12] = state->dcur.fec_mask;
 
 	if (state->dcur.symbol_rate > 30000000) {
-		cmd.args[13] = 0x04;
-		cmd.args[14] = 0x02;
 		reg_ratediv = 0x04;
 		reg_clkdiv = 0x02;
 	} else if (state->dcur.symbol_rate > 10000000) {
-		cmd.args[13] = 0x06;
-		cmd.args[14] = 0x03;
 		reg_ratediv = 0x06;
 		reg_clkdiv = 0x03;
 	} else {
-		cmd.args[13] = 0x0a;
-		cmd.args[14] = 0x05;
 		reg_ratediv = 0x0a;
 		reg_clkdiv = 0x05;
 	}
+
+	cmd.args[13] = reg_ratediv;
+	cmd.args[14] = reg_clkdiv;
 
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_CLKDIV0 : CX24117_REG_CLKDIV1, reg_clkdiv);
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_RATEDIV0 : CX24117_REG_RATEDIV1, reg_ratediv);
 
-	cmd.args[15] = 0;
+	cmd.args[15] = 0; // pne
 	cmd.len = 16;
 
 	do {
@@ -1296,7 +1293,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
 			CX24117_SIGNAL_MASK;
 
-		printk("%s() demod%d status_setfe = %x\n",
+		dprintk("%s() demod%d status_setfe = %x\n",
 			__func__, state->demod, status);
 
 		cx24117_writereg(state, (state->demod == 0) ?
