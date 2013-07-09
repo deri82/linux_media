@@ -37,6 +37,13 @@ static int debug;
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 
+/* SNR measurements */
+static int esno_snr;
+module_param(esno_snr, int, 0644);
+MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
+	"1=PERCENTAGE 0-100 (default:0)");
+
+
 #define dprintk(args...) \
 	do { \
 		if (debug) \
@@ -53,6 +60,8 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 
 #define CX24117_REG_SSTATUS0   (0x3a)      /* demod0 signal high / status */
 #define CX24117_REG_SIGNAL0    (0x3b)
+#define CX24117_REG_QUALITYH0  (0x40)
+#define CX24117_REG_QUALITYL0  (0x41)
 #define CX24117_REG_BER0       (0x4a)
 #define CX24117_REG_DVBS_UCB0  (0x4c)
 #define CX24117_REG_DVBS2_UCB0 (0x51)
@@ -62,6 +71,8 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 
 #define CX24117_REG_SSTATUS1   (0x5b)      /* demod1 signal high / status */
 #define CX24117_REG_SIGNAL1    (0x5c)
+#define CX24117_REG_QUALITYH1  (0x61)
+#define CX24117_REG_QUALITYL1  (0x62)
 #define CX24117_REG_BER1       (0x6b)
 #define CX24117_REG_DVBS_UCB1  (0x6d)
 #define CX24117_REG_DVBS2_UCB1 (0x72)
@@ -728,7 +739,7 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 			cx24117_readreg(state, (state->demod == 0) ?
 			  CX24117_REG_SIGNAL0 : CX24117_REG_SIGNAL1);
 
-	*signal_strength = -(100 * sig_reading + 94324);
+	*signal_strength = -100 * sig_reading + 94324;
 
 	dprintk("%s demod%d: raw / cooked = 0x%04x / 0x%04x\n",
 		__func__, state->demod, sig_reading, *signal_strength);
@@ -736,15 +747,41 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 	return 0;	
 }
 
-/* TODO */
+/* SNR (0..100)% */
+static int cx24117_read_snr_pct(struct dvb_frontend *fe, u16 *snr)
+{
+	struct cx24117_state *state = fe->demodulator_priv;
+	u8 snr_reading = (u8) *snr;
+
+	if (snr_reading >= 0xa0 /* 100% */)
+		*snr = 0xffff;
+	else
+		*snr = 4530 * snr_reading / 11;
+
+	dprintk("%s demod%d: raw / cooked = 0x%02x / 0x%04x\n", __func__,
+		state->demod, snr_reading, *snr);
+
+	return 0;
+}
+
 static int cx24117_read_snr(struct dvb_frontend *fe, u16 *snr)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
+	int ret = 0;
+	u8 reg_h = (state->demod == 0) ?
+		CX24117_REG_QUALITYH0 : CX24117_REG_QUALITYH1;
+	u8 reg_l = (state->demod == 0) ?
+		CX24117_REG_QUALITYL0 : CX24117_REG_QUALITYL1;
 
 	dprintk("%s() demod%d\n", __func__, state->demod);
 
-	*snr = 0;
-	return 0;
+	*snr = cx24117_readreg(state, reg_h) << 8 |
+	       cx24117_readreg(state, reg_l);
+
+	if (esno_snr == 1)
+		ret = cx24117_read_snr_pct(fe, snr);
+
+	return ret;
 }
 
 static int cx24117_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
