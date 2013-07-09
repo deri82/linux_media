@@ -52,6 +52,7 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 #define CX24117_REG_EXECUTE    (0x1f)      /* execute command */
 
 #define CX24117_REG_SSTATUS0   (0x3a)      /* demod0 signal high / status */
+#define CX24117_REG_SIGNAL0    (0x3b)
 #define CX24117_REG_BER0       (0x4a)
 #define CX24117_REG_DVBS_UCB0  (0x4c)
 #define CX24117_REG_DVBS2_UCB0 (0x51)
@@ -60,6 +61,7 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 #define CX24117_REG_RATEDIV0   (0xf0)
 
 #define CX24117_REG_SSTATUS1   (0x5b)      /* demod1 signal high / status */
+#define CX24117_REG_SIGNAL1    (0x5c)
 #define CX24117_REG_BER1       (0x6b)
 #define CX24117_REG_DVBS_UCB1  (0x6d)
 #define CX24117_REG_DVBS2_UCB1 (0x72)
@@ -158,6 +160,7 @@ struct cx24117_priv {
 	u8 skip_fw_load;
 
 	struct mutex fe_lock;
+	atomic_t fe_nr;
 };
 
 /* one per each fe */
@@ -701,16 +704,36 @@ static int cx24117_read_ber(struct dvb_frontend *fe, u32 *ber)
 	return 0;
 }
 
-/* TODO  */
 static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 	u16 *signal_strength)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
+	struct cx24117_cmd cmd;
+	int ret;
+	u16 sig_reading;
 
 	dprintk("%s() demod%d\n", __func__, state->demod);
 
-	*signal_strength = 0;
-	return 0;
+	/* Firmware CMD 1A */
+	cmd.args[0] = 0x1a;
+	cmd.args[1] = (u8) state->demod;
+	cmd.len = 2;
+	ret = cx24117_cmd_execute(fe, &cmd);
+	if (ret != 0)
+		return ret;
+
+	sig_reading = ((cx24117_readreg(state, (state->demod == 0) ?
+			  CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
+			  CX24117_SIGNAL_MASK) << 2) | 
+			cx24117_readreg(state, (state->demod == 0) ?
+			  CX24117_REG_SIGNAL0 : CX24117_REG_SIGNAL1);
+
+	*signal_strength = -(100 * sig_reading + 94324);
+
+	dprintk("%s demod%d: raw / cooked = 0x%04x / 0x%04x\n",
+		__func__, state->demod, sig_reading, *signal_strength);
+
+	return 0;	
 }
 
 /* TODO */
@@ -1024,6 +1047,8 @@ static void cx24117_release(struct dvb_frontend *fe)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	dprintk("%s demod%d\n", __func__, state->demod);
+	if (!atomic_dec_and_test(&state->priv->fe_nr))
+		kfree(state->priv);
 	kfree(state);
 }
 
@@ -1055,6 +1080,9 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 		demod = 1;
 		priv = ((struct cx24117_state*) fe->demodulator_priv)->priv;
 	}
+
+	/* nr of frontends using the module */
+	atomic_inc(&priv->fe_nr);
 
 	/* allocate memory for the internal state */
 	state = kzalloc(sizeof(struct cx24117_state), GFP_KERNEL);
