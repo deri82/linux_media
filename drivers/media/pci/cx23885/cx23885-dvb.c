@@ -1034,18 +1034,22 @@ static int dvb_register(struct cx23885_tsport *port)
 		break;
 	case CX23885_BOARD_TBS_6981:
 		i2c_bus = &dev->i2c_bus[1];
+
 		switch (port->nr) {
 		/* PORT B */
 		case 1:
 			fe0->dvb.frontend = dvb_attach(cx24117_attach,
-						&tbs_cx24117_config,
-						&i2c_bus->i2c_adap, 0);
+					&tbs_cx24117_config,
+					&i2c_bus->i2c_adap, NULL);
 			break;
-		/* PORT A */
+		/* PORT C */
 		case 2:
+			fe1 = videobuf_dvb_get_frontend(
+				&port->dev->ts1.frontends, 1);
+
 			fe0->dvb.frontend = dvb_attach(cx24117_attach,
-						&tbs_cx24117_config,
-						&i2c_bus->i2c_adap, 1);
+					&tbs_cx24117_config,
+					&i2c_bus->i2c_adap, fe1->dvb.frontend);
 			break;
 		}
 		break;
