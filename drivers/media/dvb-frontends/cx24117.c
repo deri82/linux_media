@@ -33,23 +33,11 @@
 #include "dvb_frontend.h"
 #include "cx24117.h"
 
-static int debug;
-module_param(debug, int, 0644);
-MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
-
 /* SNR measurements */
 static int esno_snr;
 module_param(esno_snr, int, 0644);
 MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 	"1=PERCENTAGE 0-100 (default:0)");
-
-
-#define dprintk(args...) \
-	do { \
-		if (debug) \
-			printk(KERN_INFO "cx24117: " args); \
-	} while (0)
-
 
 
 #define CX24117_DEFAULT_FIRMWARE "dvb-fe-cx24117.fw"
@@ -121,6 +109,9 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 
 #define CX24117_PNE	(0) /* 0 disabled / 2 enabled */
 #define CX24117_OCC	(1) /* 0 disabled / 1 enabled */
+
+
+#define dprintk
 
 enum cmds {
 	CMD_SET_VCO     = 0x10,
@@ -229,7 +220,7 @@ static struct cx24117_modfec {
  { SYS_DVBS2, PSK_8, FEC_9_10, 0x00, 0x11 },
  { SYS_DVBS2, PSK_8, FEC_AUTO, 0x00, 0x00 },
  /*
-  * `val' can be found in the FECSTATUS register when tuning.
+  * 'val' can be found in the FECSTATUS register when tuning.
   * FECSTATUS will give the actual FEC in use if tuning was successful.
   */
 };
@@ -242,14 +233,15 @@ static int cx24117_writereg(struct cx24117_state *state, int reg, int data)
 		.flags = 0, .buf = buf, .len = 2 };
 	int err;
 
-	if (debug > 1)
-		printk("cx24117: %s: write reg 0x%02x, value 0x%02x\n",
-			__func__, reg, data);
+	dev_dbg(&state->priv->i2c->dev,
+			"%s() demod%d i2c wr @0x%02x=0x%02x\n",
+			__func__, state->demod, reg, data);
 
 	err = i2c_transfer(state->priv->i2c, &msg, 1);
 	if (err != 1) {
-		printk(KERN_ERR "%s: writereg error(err == %i, reg == 0x%02x,"
-			 " value == 0x%02x)\n", __func__, err, reg, data);
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod%d i2c wr err(%i) @0x%02x=0x%02x\n",
+			KBUILD_MODNAME, state->demod, err, reg, data);
 		return -EREMOTEIO;
 	}
 
@@ -271,14 +263,14 @@ static int cx24117_readreg(struct cx24117_state *state, u8 reg)
 	ret = i2c_transfer(state->priv->i2c, msg, 2);
 
 	if (ret != 2) {
-		printk(KERN_ERR "%s: reg=0x%x (error=%d)\n",
-			__func__, reg, ret);
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod%d i2c rd err(%d) @0x%x\n",
+			KBUILD_MODNAME, state->demod, ret, reg);
 		return ret;
 	}
 
-	if (debug > 1)
-		printk(KERN_INFO "cx24117: read reg 0x%02x, value 0x%02x\n",
-			reg, b1[0]);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d i2c rd @0x%02x=0x%02x\n",
+		__func__, state->demod, reg, b1[0]);
 
 	return b1[0];
 }
@@ -286,7 +278,8 @@ static int cx24117_readreg(struct cx24117_state *state, u8 reg)
 static int cx24117_set_inversion(struct cx24117_state *state,
 	fe_spectral_inversion_t inversion)
 {
-	dprintk("%s(%d) demod%d\n", __func__, inversion, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s(%d) demod%d\n",
+		__func__, inversion, state->demod);
 
 	switch (inversion) {
 	case INVERSION_OFF:
@@ -312,7 +305,9 @@ static int cx24117_lookup_fecmod(struct cx24117_state *state,
 {
 	int i, ret = -EOPNOTSUPP;
 
-	//dprintk("%s(0x%02x,0x%02x)\n", __func__, m, f);
+	dev_dbg(&state->priv->i2c->dev,
+		"%s(demod(0x%02x,0x%02x) demod%d\n",
+		__func__, m, f, state->demod);
 
 	for (i = 0; i < ARRAY_SIZE(CX24117_MODFEC_MODES); i++) {
 		if ((d == CX24117_MODFEC_MODES[i].delivery_system) &&
@@ -331,7 +326,8 @@ static int cx24117_set_fec(struct cx24117_state *state,
 {
 	int ret;
 
-	dprintk("%s(0x%02x,0x%02x) demod%d\n",
+	dev_dbg(&state->priv->i2c->dev,
+		"%s(0x%02x,0x%02x) demod%d\n",
 		__func__, mod, fec, state->demod);
 
 	ret = cx24117_lookup_fecmod(state, delsys, mod, fec);
@@ -341,7 +337,8 @@ static int cx24117_set_fec(struct cx24117_state *state,
 	state->dnxt.fec = fec;
 	state->dnxt.fec_val = CX24117_MODFEC_MODES[ret].val;
 	state->dnxt.fec_mask = CX24117_MODFEC_MODES[ret].mask;
-	dprintk("%s() demod%d mask/val = 0x%02x/0x%02x\n", __func__,
+	dev_dbg(&state->priv->i2c->dev,
+		"%s() demod%d mask/val = 0x%02x/0x%02x\n", __func__,
 		state->demod, state->dnxt.fec_mask, state->dnxt.fec_val);
 
 	return 0;
@@ -349,17 +346,22 @@ static int cx24117_set_fec(struct cx24117_state *state,
 
 static int cx24117_set_symbolrate(struct cx24117_state *state, u32 rate)
 {
-	dprintk("%s(%d) demod%d\n", __func__, rate, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s(%d) demod%d\n",
+		__func__, rate, state->demod);
 
 	/*  check if symbol rate is within limits */
 	if ((rate > state->frontend.ops.info.symbol_rate_max) ||
 	    (rate < state->frontend.ops.info.symbol_rate_min)) {
-		printk("%s() unsupported symbol_rate = %d\n", __func__, rate);
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod%d unsupported symbol_rate = %d\n",
+			KBUILD_MODNAME, state->demod, rate);
 		return -EOPNOTSUPP;
 	}
 
 	state->dnxt.symbol_rate = rate;
-	dprintk("%s() demod%d symbol_rate = %d\n", __func__, state->demod, rate);
+	dev_dbg(&state->priv->i2c->dev,
+		"%s() demod%d symbol_rate = %d\n",
+		__func__, state->demod, rate);
 
 	return 0;
 }
@@ -373,7 +375,8 @@ static int cx24117_firmware_ondemand(struct dvb_frontend *fe)
 	const struct firmware *fw;
 	int ret = 0;
 
-	dprintk("%s(): skip_fw_load=%d\n", __func__, state->priv->skip_fw_load);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d skip_fw_load=%d\n",
+		__func__, state->demod, state->priv->skip_fw_load);
 
 	/* check if firmware if already running */
 	if (cx24117_readreg(state, 0xeb) != 0xa) {
@@ -423,7 +426,8 @@ static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe, struct cx24117_cm
 	struct cx24117_state *state = fe->demodulator_priv;
 	int i, ret;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
+		__func__, state->demod);
 
 	/* Load the firmware if required */
 	ret = cx24117_firmware_ondemand(fe);
@@ -435,7 +439,7 @@ static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe, struct cx24117_cm
 
 	/* Write the command */
 	for (i = 0; i < cmd->len ; i++) {
-		dprintk("%s: 0x%02x == 0x%02x\n", __func__, i, cmd->args[i]);
+		//dprintk("%s: 0x%02x == 0x%02x\n", __func__, i, cmd->args[i]);
 		cx24117_writereg(state, i, cmd->args[i]);
 	}
 
@@ -478,13 +482,10 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	struct i2c_msg msg;
 	u8 *buf;
 
-	dprintk("%s\n", __func__);
-	dprintk("Firmware is %zu bytes (%02x %02x .. %02x %02x)\n",
-			fw->size,
-			fw->data[0],
-			fw->data[1],
-			fw->data[fw->size-2],
-			fw->data[fw->size-1]);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d " \
+		"Firmware is %zu bytes (%02x %02x .. %02x %02x)\n",
+		__func__, state->demod, fw->size,
+		fw->data[0], fw->data[1], fw->data[fw->size-2], fw->data[fw->size-1]);
 
 	cx24117_writereg(state, 0xea, 0x00);
 	cx24117_writereg(state, 0xea, 0x01);
@@ -545,7 +546,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	buf[0] = 0xfa;
 	memcpy(&buf[1], fw->data, fw->size);
 
-	/* prepare i2c message to send i2c */
+	/* prepare i2c message to send */
 	msg.addr = (u16) state->priv->demod_address;
 	msg.flags = 0;
 	msg.len = fw->size+1;
@@ -682,7 +683,8 @@ static int cx24117_read_status(struct dvb_frontend *fe, fe_status_t *status)
 				      CX24117_REG_SSTATUS1 ) & 
 		CX24117_STATUS_MASK;
 
-	//dprintk("%s: demod%d status = 0x%02x\n", __func__, state->demod, lock);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d status = 0x%02x\n",
+		__func__, state->demod, lock);
 
 	*status = 0;
 
@@ -705,12 +707,13 @@ static int cx24117_read_ber(struct dvb_frontend *fe, u32 *ber)
 			CX24117_REG_BER0 :
 			CX24117_REG_BER1;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
-
 	*ber =  (cx24117_readreg(state, base_reg-3) << 24) |
 		(cx24117_readreg(state, base_reg-2) << 16) |
 		(cx24117_readreg(state, base_reg-1)  << 8)  |
 		 cx24117_readreg(state, base_reg);
+
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ber=0x%04x\n",
+		__func__, state->demod, *ber);
 
 	return 0;
 }
@@ -722,8 +725,6 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 	struct cx24117_cmd cmd;
 	int ret;
 	u16 sig_reading;
-
-	dprintk("%s() demod%d\n", __func__, state->demod);
 
 	/* Firmware CMD 1A */
 	cmd.args[0] = 0x1a;
@@ -741,45 +742,39 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 
 	*signal_strength = -100 * sig_reading + 94324;
 
-	dprintk("%s demod%d: raw / cooked = 0x%04x / 0x%04x\n",
+	dev_dbg(&state->priv->i2c->dev,
+		"%s() demod%d raw / cooked = 0x%04x / 0x%04x\n",
 		__func__, state->demod, sig_reading, *signal_strength);
 
 	return 0;	
-}
-
-/* SNR (0..100)% */
-static int cx24117_read_snr_pct(struct dvb_frontend *fe, u16 *snr)
-{
-	struct cx24117_state *state = fe->demodulator_priv;
-	u8 snr_reading = (u8) *snr;
-
-	if (snr_reading >= 0xa0 /* 100% */)
-		*snr = 0xffff;
-	else
-		*snr = 4530 * snr_reading / 11;
-
-	dprintk("%s demod%d: raw / cooked = 0x%02x / 0x%04x\n", __func__,
-		state->demod, snr_reading, *snr);
-
-	return 0;
 }
 
 static int cx24117_read_snr(struct dvb_frontend *fe, u16 *snr)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	int ret = 0;
+	u16 snr_reading;
+
 	u8 reg_h = (state->demod == 0) ?
 		CX24117_REG_QUALITYH0 : CX24117_REG_QUALITYH1;
 	u8 reg_l = (state->demod == 0) ?
 		CX24117_REG_QUALITYL0 : CX24117_REG_QUALITYL1;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	snr_reading = cx24117_readreg(state, reg_h) << 8 |
+		      cx24117_readreg(state, reg_l);
 
-	*snr = cx24117_readreg(state, reg_h) << 8 |
-	       cx24117_readreg(state, reg_l);
+	if (esno_snr == 1) {
+		if (snr_reading >= 0xa0 /* 100% */)
+			*snr = 0xffff;
+		else
+			*snr = 4530 * snr_reading / 11;
+	} else {
+		*snr = snr_reading;
+	}
 
-	if (esno_snr == 1)
-		ret = cx24117_read_snr_pct(fe, snr);
+	dev_dbg(&state->priv->i2c->dev,
+		"%s() demod%d raw / cooked=%d%% / 0x%04x\n",
+		__func__, state->demod, snr_reading, *snr);
 
 	return ret;
 }
@@ -789,8 +784,6 @@ static int cx24117_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 	struct cx24117_state *state = fe->demodulator_priv;
 	fe_delivery_system_t delsys = fe->dtv_property_cache.delivery_system;
 	u8 base_reg;
-
-	dprintk("%s() demod%d\n", __func__, state->demod);
 
 	switch (delsys) {
 	case SYS_DVBS:
@@ -810,6 +803,9 @@ static int cx24117_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 	*ucblocks = (cx24117_readreg(state, base_reg-1) << 8) |
 		     cx24117_readreg(state, base_reg);
 
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ucb=0x%04x\n",
+		__func__, state->demod, *ucblocks);
+
 	return 0;
 }
 
@@ -828,17 +824,18 @@ static int cx24117_wait_for_lnb(struct dvb_frontend *fe)
 	u8 reg = (state->demod == 0) ? CX24117_REG_QSTATUS0 :
 				       CX24117_REG_QSTATUS1;
 
-	dprintk("%s() demod%d qstatus = 0x%02x\n", __func__, state->demod,
-		cx24117_readreg(state, reg));
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d qstatus = 0x%02x\n",
+		__func__, state->demod, cx24117_readreg(state, reg));
 
 	/* Wait for up to 300 ms */
-	for (i = 0; i < 30 ; i++) {
+	for (i = 0; i < 15 ; i++) {
 		if (cx24117_readreg(state, reg) & 0x01)
 			return 0;
-		msleep(10);
+		msleep(20);
 	}
 
-	dprintk("%s() demod%d: LNB not ready\n", __func__, state->demod);
+	dev_warn(&state->priv->i2c->dev, "%s: demod%d LNB not ready\n",
+		KBUILD_MODNAME, state->demod);
 
 	return -ETIMEDOUT; /* -EBUSY ? */
 }
@@ -851,7 +848,8 @@ static int cx24117_set_voltage(struct dvb_frontend *fe,
 	int ret;
 	u8 reg = (state->demod == 0) ? 0x10 : 0x20;
 
-	dprintk("%s: demod%d %s\n", __func__, state->demod,
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d %s\n",
+		__func__, state->demod,
 		voltage == SEC_VOLTAGE_13 ? "SEC_VOLTAGE_13" :
 		voltage == SEC_VOLTAGE_18 ? "SEC_VOLTAGE_18" : "SEC_VOLTAGE_OFF");
 
@@ -907,9 +905,11 @@ static int cx24117_set_tone(struct dvb_frontend *fe,
 	struct cx24117_cmd cmd;
 	int ret;
 
-	dprintk("%s(%d) demod%d\n", __func__, state->demod, tone);
+	dev_dbg(&state->priv->i2c->dev, "%s(%d) demod%d\n",
+		__func__, state->demod, tone);
 	if ((tone != SEC_TONE_ON) && (tone != SEC_TONE_OFF)) {
-		printk(KERN_ERR "%s: Invalid, tone=%d\n", __func__, tone);
+		dev_warn(&state->priv->i2c->dev, "%s: demod%d invalid tone=%d\n",
+			KBUILD_MODNAME, state->demod, tone);
 		return -EINVAL;
 	}
 
@@ -980,7 +980,7 @@ static int cx24117_send_diseqc_msg(struct dvb_frontend *fe,
 	int i, ret;
 
 	/* Dump DiSEqC message */
-	if (debug) {
+	/*if (debug) {
 		printk(KERN_INFO "cx24117: demod %d %s(",
 			state->demod, __func__);
 		for (i = 0 ; i < d->msg_len ;) {
@@ -989,7 +989,7 @@ static int cx24117_send_diseqc_msg(struct dvb_frontend *fe,
 				printk(KERN_INFO ", ");
 		}
 		printk(")\n");
-	}
+	}*/
 
 	/* Validate length */
 	if (d->msg_len > 15)
@@ -1027,10 +1027,10 @@ static int cx24117_send_diseqc_msg(struct dvb_frontend *fe,
 	if (d->msg_len >= 4 && d->msg[2] == 0x38)
 		state->dsec_cmd.args[CX24117_DISEQC_BURST] =
 			((d->msg[3] & 4) >> 2);
-	if (debug)
-		dprintk("%s demod%d burst=%d\n",
-			__func__, state->demod,
-			state->dsec_cmd.args[CX24117_DISEQC_BURST]);
+
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d burst=%d\n",
+		__func__, state->demod,
+		state->dsec_cmd.args[CX24117_DISEQC_BURST]);
 
 	/* Wait for LNB ready */
 	ret = cx24117_wait_for_lnb(fe);
@@ -1065,7 +1065,8 @@ static int cx24117_diseqc_send_burst(struct dvb_frontend *fe,
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 
-	dprintk("%s(%d) demod=%d\n", __func__, burst, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s(%d) demod=%d\n",
+		__func__, burst, state->demod);
 
 	/* DiSEqC burst */
 	if (burst == SEC_MINI_A)
@@ -1083,7 +1084,8 @@ static int cx24117_diseqc_send_burst(struct dvb_frontend *fe,
 static void cx24117_release(struct dvb_frontend *fe)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
-	dprintk("%s demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s demod%d\n",
+		__func__, state->demod);
 	if (!atomic_dec_and_test(&state->priv->fe_nr))
 		kfree(state->priv);
 	kfree(state);
@@ -1097,8 +1099,6 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 	struct cx24117_state *state = NULL;
 	struct cx24117_priv *priv = NULL;
 	int demod = 0;
-
-	dprintk("%s\n", __func__);
 
 	printk("CX24117 attaching frontend %d\n", demod);
 
@@ -1153,7 +1153,8 @@ static int cx24117_initfe(struct dvb_frontend *fe)
 	struct cx24117_cmd cmd;
 	int ret;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
+		__func__, state->demod);
 
 	/* Firmware CMD 36: Power config */
 	cmd.args[0] = CMD_TUNERSLEEP;
@@ -1198,7 +1199,8 @@ static int cx24117_sleep(struct dvb_frontend *fe)
 	struct cx24117_state *state = fe->demodulator_priv;
 	struct cx24117_cmd cmd;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
+		__func__, state->demod);
 
 	/* Firmware CMD 36: Power config */
 	cmd.args[0] = CMD_TUNERSLEEP;
@@ -1220,17 +1222,19 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 	int i, status, ret, retune = 1;
 	u8 reg_clkdiv, reg_ratediv;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
+		__func__, state->demod);
 
 	switch (c->delivery_system) {
 	case SYS_DVBS:
-		dprintk("%s: demod%d DVB-S delivery system selected\n",
+		dev_dbg(&state->priv->i2c->dev, "%s() demod%d DVB-S\n",
 			__func__, state->demod);
 
 		/* Only QPSK is supported for DVB-S */
 		if (c->modulation != QPSK) {
-			dprintk("%s: unsupported modulation selected (%d)\n",
-				__func__, c->modulation);
+			dev_dbg(&state->priv->i2c->dev,
+				"%s() demod%d unsupported modulation (%d)\n",
+				__func__, state->demod, c->modulation);
 			return -EOPNOTSUPP;
 		}
 
@@ -1239,15 +1243,16 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 
 		/* DVB-S only supports 0.35 */
 		if (c->rolloff != ROLLOFF_35) {
-			dprintk("%s: unsupported rolloff selected (%d)\n",
-				__func__, c->rolloff);
+			dev_dbg(&state->priv->i2c->dev,
+				"%s() demod%d unsupported rolloff (%d)\n",
+				__func__, state->demod, c->rolloff);
 			return -EOPNOTSUPP;
 		}
 		state->dnxt.rolloff_val = CX24117_ROLLOFF_035;
 		break;
 
 	case SYS_DVBS2:
-		dprintk("%s: demod%d DVB-S2 delivery system selected\n",
+		dev_dbg(&state->priv->i2c->dev, "%s() demod%d DVB-S2\n",
 			__func__, state->demod);
 
 		/*
@@ -1255,8 +1260,8 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 		 * but not hardware auto detection
 		 */
 		if (c->modulation != PSK_8 && c->modulation != QPSK) {
-			dprintk("%s: demod%d"
-				"unsupported modulation selected (%d)\n",
+			dev_dbg(&state->priv->i2c->dev, "%s() demod%d"
+				"unsupported modulation (%d)\n",
 				__func__, state->demod, c->modulation);
 			return -EOPNOTSUPP;
 		}
@@ -1272,8 +1277,9 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			state->dnxt.pilot_val = CX24117_PILOT_ON;
 			break;
 		default:
-			dprintk("%s: unsupported pilot mode selected (%d)\n",
-				__func__, c->pilot);
+			dev_dbg(&state->priv->i2c->dev,
+				"%s() demod%d unsupported pilot mode (%d)\n",
+				__func__, state->demod, c->pilot);
 			return -EOPNOTSUPP;
 		}
 
@@ -1293,15 +1299,17 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			retune = 3;
 			break;
 		default:
-			printk("%s: unsupported rolloff selected (%d)\n",
-				__func__, c->rolloff);
+			dev_warn(&state->priv->i2c->dev,
+				"%s: demod%d unsupported rolloff (%d)\n",
+				KBUILD_MODNAME, state->demod, c->rolloff);
 			return -EOPNOTSUPP;
 		}
 		break;
 
 	default:
-		printk("%s: unsupported delivery system selected (%d)\n",
-			__func__, c->delivery_system);
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod %d unsupported delivery system (%d)\n",
+			KBUILD_MODNAME, state->demod, c->delivery_system);
 		return -EOPNOTSUPP;
 	}
 
@@ -1397,7 +1405,8 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
 			CX24117_SIGNAL_MASK;
 
-		dprintk("%s() demod%d status_setfe = %x\n",
+		dev_dbg(&state->priv->i2c->dev,
+			"%s() demod%d status_setfe = %02x\n",
 			__func__, state->demod, status);
 
 		cx24117_writereg(state, (state->demod == 0) ?
@@ -1418,13 +1427,16 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			cx24117_read_status(fe, &tunerstat);
 			status = tunerstat & (FE_HAS_SIGNAL | FE_HAS_SYNC);
 			if (status == (FE_HAS_SIGNAL | FE_HAS_SYNC)) {
-				dprintk("%s: Tuned\n", __func__);
-				goto tuned;
+				dev_dbg(&state->priv->i2c->dev,
+					"%s() demod%d tuned\n",
+					__func__, state->demod);
+				return 0;
 			}
 			msleep(10);
 		}
 
-		dprintk("%s: demod%d not tuned\n", __func__, state->demod);
+		dev_dbg(&state->priv->i2c->dev, "%s() demod%d not tuned\n",
+			__func__, state->demod);
 
 		/* try next rolloff value */
 		if (state->dcur.rolloff == 3)
@@ -1432,7 +1444,6 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 
 	} while (--retune);
 	return -EINVAL;
-tuned:	return 0;
 }
 
 static int cx24117_tune(struct dvb_frontend *fe, bool re_tune,
@@ -1440,7 +1451,8 @@ static int cx24117_tune(struct dvb_frontend *fe, bool re_tune,
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 
-	dprintk("%s() demod%d\n", __func__, state->demod);
+	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
+		__func__, state->demod);
 
 	/*
 	 * It is safe to discard "params" here, as the DVB core will sync
