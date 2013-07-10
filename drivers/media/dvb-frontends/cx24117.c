@@ -44,6 +44,7 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 #define CX24117_SEARCH_RANGE_KHZ 5000
 
 /* known registers */
+#define CX24117_REG_COMMAND    (0x00)      /* command buffer */
 #define CX24117_REG_EXECUTE    (0x1f)      /* execute command */
 
 #define CX24117_REG_SSTATUS0   (0x3a)      /* demod0 signal high / status */
@@ -226,7 +227,7 @@ static struct cx24117_modfec {
 };
 
 
-static int cx24117_writereg(struct cx24117_state *state, int reg, int data)
+static int cx24117_writereg(struct cx24117_state *state, u8 reg, u8 data)
 {
 	u8 buf[] = { reg, data };
 	struct i2c_msg msg = { .addr = state->priv->demod_address,
@@ -248,16 +249,44 @@ static int cx24117_writereg(struct cx24117_state *state, int reg, int data)
 	return 0;
 }
 
+static int cx24117_writecmd(struct cx24117_state *state,
+	struct cx24117_cmd *cmd)
+{
+	struct i2c_msg msg;
+	u8 buf[CX24117_ARGLEN+1];
+	int ret = 0;
+
+	dev_dbg(&state->priv->i2c->dev,
+			"%s() demod%d i2c wr cmd len=%d\n",
+			__func__, state->demod, cmd->len);
+
+	buf[0] = CX24117_REG_COMMAND;
+	memcpy(&buf[1], cmd->args, cmd->len);
+
+	msg.addr = state->priv->demod_address;
+	msg.flags = 0;
+	msg.len = cmd->len+1;
+	msg.buf = buf;
+	ret = i2c_transfer(state->priv->i2c, &msg, 1);
+	if (ret != cmd->len) {
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod%d i2c wr cmd err(%i) len=%d\n",
+			KBUILD_MODNAME, state->demod, ret, cmd->len);
+		return -EREMOTEIO;
+	}
+
+	return 0;
+}
+
 static int cx24117_readreg(struct cx24117_state *state, u8 reg)
 {
 	int ret;
-	u8 b0[] = { reg };
-	u8 b1[] = { 0 };
+	u8 recv = 0;
 	struct i2c_msg msg[] = {
 		{ .addr = state->priv->demod_address, .flags = 0,
-			.buf = b0, .len = 1 },
+			.buf = &reg, .len = 1 },
 		{ .addr = state->priv->demod_address, .flags = I2C_M_RD,
-			.buf = b1, .len = 1 }
+			.buf = &recv, .len = 1 }
 	};
 
 	ret = i2c_transfer(state->priv->i2c, msg, 2);
@@ -266,13 +295,13 @@ static int cx24117_readreg(struct cx24117_state *state, u8 reg)
 		dev_warn(&state->priv->i2c->dev,
 			"%s: demod%d i2c rd err(%d) @0x%x\n",
 			KBUILD_MODNAME, state->demod, ret, reg);
-		return ret;
+		return -EREMOTEIO;
 	}
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d i2c rd @0x%02x=0x%02x\n",
-		__func__, state->demod, reg, b1[0]);
+		__func__, state->demod, reg, recv);
 
-	return b1[0];
+	return recv;
 }
 
 static int cx24117_set_inversion(struct cx24117_state *state,
@@ -403,7 +432,7 @@ static int cx24117_firmware_ondemand(struct dvb_frontend *fe)
 
 		ret = cx24117_load_firmware(fe, fw);
 		if (ret)
-			printk(KERN_ERR "%s: Writing firmware to device failed\n",
+			printk(KERN_ERR "%s: Writing firmware failed\n",
 				__func__);
 
 		release_firmware(fw);
@@ -421,7 +450,8 @@ static int cx24117_firmware_ondemand(struct dvb_frontend *fe)
 /* Take a basic firmware command structure, format it
  * and forward it for processing
  */
-static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe, struct cx24117_cmd *cmd)
+static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe,
+	struct cx24117_cmd *cmd)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	int i, ret;
@@ -438,10 +468,7 @@ static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe, struct cx24117_cm
 	}
 
 	/* Write the command */
-	for (i = 0; i < cmd->len ; i++) {
-		//dprintk("%s: 0x%02x == 0x%02x\n", __func__, i, cmd->args[i]);
-		cx24117_writereg(state, i, cmd->args[i]);
-	}
+	cx24117_writecmd(state, cmd);
 
 	/* Start execution and wait for cmd to terminate */
 	cx24117_writereg(state, CX24117_REG_EXECUTE, 0x01);
@@ -677,11 +704,14 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 static int cx24117_read_status(struct dvb_frontend *fe, fe_status_t *status)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
+	int lock;
 
-	int lock = cx24117_readreg(state,
+	mutex_lock(&state->priv->fe_lock);
+	lock = cx24117_readreg(state,
 		(state->demod == 0) ? CX24117_REG_SSTATUS0 :
 				      CX24117_REG_SSTATUS1 ) & 
 		CX24117_STATUS_MASK;
+	mutex_unlock(&state->priv->fe_lock);
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d status = 0x%02x\n",
 		__func__, state->demod, lock);
@@ -707,10 +737,12 @@ static int cx24117_read_ber(struct dvb_frontend *fe, u32 *ber)
 			CX24117_REG_BER0 :
 			CX24117_REG_BER1;
 
+	mutex_lock(&state->priv->fe_lock);
 	*ber =  (cx24117_readreg(state, base_reg-3) << 24) |
 		(cx24117_readreg(state, base_reg-2) << 16) |
 		(cx24117_readreg(state, base_reg-1)  << 8)  |
 		 cx24117_readreg(state, base_reg);
+	mutex_unlock(&state->priv->fe_lock);
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ber=0x%04x\n",
 		__func__, state->demod, *ber);
@@ -730,7 +762,8 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 	cmd.args[0] = 0x1a;
 	cmd.args[1] = (u8) state->demod;
 	cmd.len = 2;
-	ret = cx24117_cmd_execute(fe, &cmd);
+	mutex_lock(&state->priv->fe_lock);
+	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
 		return ret;
 
@@ -739,6 +772,7 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 			  CX24117_SIGNAL_MASK) << 2) | 
 			cx24117_readreg(state, (state->demod == 0) ?
 			  CX24117_REG_SIGNAL0 : CX24117_REG_SIGNAL1);
+	mutex_unlock(&state->priv->fe_lock);
 
 	*signal_strength = -100 * sig_reading + 94324;
 
@@ -760,9 +794,12 @@ static int cx24117_read_snr(struct dvb_frontend *fe, u16 *snr)
 	u8 reg_l = (state->demod == 0) ?
 		CX24117_REG_QUALITYL0 : CX24117_REG_QUALITYL1;
 
+	mutex_lock(&state->priv->fe_lock);
 	snr_reading = cx24117_readreg(state, reg_h) << 8 |
 		      cx24117_readreg(state, reg_l);
+	mutex_unlock(&state->priv->fe_lock);
 
+	/* display in percentage */
 	if (esno_snr == 1) {
 		if (snr_reading >= 0xa0 /* 100% */)
 			*snr = 0xffff;
@@ -800,8 +837,10 @@ static int cx24117_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 		return 1;
 	}
 
+	mutex_lock(&state->priv->fe_lock);
 	*ucblocks = (cx24117_readreg(state, base_reg-1) << 8) |
 		     cx24117_readreg(state, base_reg);
+	mutex_unlock(&state->priv->fe_lock);
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ucb=0x%04x\n",
 		__func__, state->demod, *ucblocks);
@@ -821,17 +860,20 @@ static int cx24117_wait_for_lnb(struct dvb_frontend *fe)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	int i;
-	u8 reg = (state->demod == 0) ? CX24117_REG_QSTATUS0 :
-				       CX24117_REG_QSTATUS1;
+	u8 val, reg = (state->demod == 0) ? CX24117_REG_QSTATUS0 :
+					    CX24117_REG_QSTATUS1;
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d qstatus = 0x%02x\n",
 		__func__, state->demod, cx24117_readreg(state, reg));
 
 	/* Wait for up to 300 ms */
-	for (i = 0; i < 15 ; i++) {
-		if (cx24117_readreg(state, reg) & 0x01)
+	for (i = 0; i < 10 ; i++) {
+		mutex_lock(&state->priv->fe_lock);
+		val = cx24117_readreg(state, reg) & 0x01;
+		mutex_unlock(&state->priv->fe_lock);
+		if (val != 0)
 			return 0;
-		msleep(20);
+		msleep(30);
 	}
 
 	dev_warn(&state->priv->i2c->dev, "%s: demod%d LNB not ready\n",
@@ -1100,8 +1142,6 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 	struct cx24117_priv *priv = NULL;
 	int demod = 0;
 
-	printk("CX24117 attaching frontend %d\n", demod);
-
 	/* first frontend attaching */
 	/* allocate shared priv struct */
 	if (fe == NULL) {
@@ -1117,6 +1157,8 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 		demod = 1;
 		priv = ((struct cx24117_state*) fe->demodulator_priv)->priv;
 	}
+
+	printk("CX24117 attaching frontend %d\n", demod);
 
 	/* nr of frontends using the module */
 	atomic_inc(&priv->fe_nr);
@@ -1156,12 +1198,14 @@ static int cx24117_initfe(struct dvb_frontend *fe)
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
 		__func__, state->demod);
 
+	mutex_lock(&state->priv->fe_lock);
+
 	/* Firmware CMD 36: Power config */
 	cmd.args[0] = CMD_TUNERSLEEP;
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = 0;
 	cmd.len = 3;
-	ret = cx24117_cmd_execute(fe, &cmd);
+	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
 		return ret;
 
@@ -1175,7 +1219,7 @@ static int cx24117_initfe(struct dvb_frontend *fe)
 	cmd.args[2] = 0x10;
 	cmd.args[3] = 0x10;
 	cmd.len = 4;
-	ret = cx24117_cmd_execute(fe, &cmd);
+	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
 		return ret;
 
@@ -1184,9 +1228,11 @@ static int cx24117_initfe(struct dvb_frontend *fe)
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = CX24117_OCC;
 	cmd.len = 3;
-	ret = cx24117_cmd_execute(fe, &cmd);
+	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
 		return ret;
+
+	mutex_unlock(&state->priv->fe_lock);
 
 	return cx24117_set_voltage(fe, SEC_VOLTAGE_13);
 }
@@ -1391,16 +1437,19 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 	cmd.args[13] = reg_ratediv;
 	cmd.args[14] = reg_clkdiv;
 
+	mutex_lock(&state->priv->fe_lock);
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_CLKDIV0 : CX24117_REG_CLKDIV1, reg_clkdiv);
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_RATEDIV0 : CX24117_REG_RATEDIV1, reg_ratediv);
+	mutex_unlock(&state->priv->fe_lock);
 
 	cmd.args[15] = CX24117_PNE;
 	cmd.len = 16;
 
 	do {
 		/* Reset status register */
+		mutex_lock(&state->priv->fe_lock);
 		status = cx24117_readreg(state, (state->demod == 0) ?
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
 			CX24117_SIGNAL_MASK;
@@ -1413,7 +1462,8 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1, status);
 
 		/* Tune */
-		ret = cx24117_cmd_execute(fe, &cmd);
+		ret = cx24117_cmd_execute_nolock(fe, &cmd);
+		mutex_unlock(&state->priv->fe_lock);
 		if (ret != 0)
 			break;
 
