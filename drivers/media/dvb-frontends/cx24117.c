@@ -657,9 +657,9 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 
 	/* Firmware CMD 35: Get firmware version */
 	cmd.args[0] = CMD_UPDFWVERS;
-	cmd.len = 0x02;
+	cmd.len = 2;
 	for (i = 0; i < 4; i++) {
-		cmd.args[0x01] = i;
+		cmd.args[1] = i;
 		ret = cx24117_cmd_execute_nolock(fe, &cmd);
 		if (ret != 0) {
 			state->priv->skip_fw_load = 0;
