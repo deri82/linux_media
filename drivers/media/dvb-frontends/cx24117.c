@@ -268,7 +268,7 @@ static int cx24117_writecmd(struct cx24117_state *state,
 	msg.len = cmd->len+1;
 	msg.buf = buf;
 	ret = i2c_transfer(state->priv->i2c, &msg, 1);
-	if (ret != cmd->len) {
+	if (ret != 1) {
 		dev_warn(&state->priv->i2c->dev,
 			"%s: demod%d i2c wr cmd err(%i) len=%d\n",
 			KBUILD_MODNAME, state->demod, ret, cmd->len);
