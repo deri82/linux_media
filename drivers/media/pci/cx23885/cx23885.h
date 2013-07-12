@@ -94,6 +94,7 @@
 #define CX23885_BOARD_HAUPPAUGE_HVR4400        38
 #define CX23885_BOARD_AVERMEDIA_HC81R          39
 #define CX23885_BOARD_TBS_6981                 40
+#define CX23885_BOARD_TBS_6980                 41
 
 #define GPIO_0 0x00000001
 #define GPIO_1 0x00000002

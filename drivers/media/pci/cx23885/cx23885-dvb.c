@@ -1032,6 +1032,7 @@ static int dvb_register(struct cx23885_tsport *port)
 			fe0->dvb.frontend->ops.set_voltage = f300_set_voltage;
 
 		break;
+	case CX23885_BOARD_TBS_6980:
 	case CX23885_BOARD_TBS_6981:
 		i2c_bus = &dev->i2c_bus[1];
 
