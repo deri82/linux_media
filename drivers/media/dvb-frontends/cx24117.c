@@ -44,48 +44,58 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 #define CX24117_SEARCH_RANGE_KHZ 5000
 
 /* known registers */
-#define CX24117_REG_COMMAND    (0x00)      /* command buffer */
-#define CX24117_REG_EXECUTE    (0x1f)      /* execute command */
+#define CX24117_REG_COMMAND      (0x00)      /* command buffer */
+#define CX24117_REG_EXECUTE      (0x1f)      /* execute command */
+
+#define CX24117_REG_FREQ3_0      (0x34)      /* frequency */
+#define CX24117_REG_FREQ2_0      (0x35)
+#define CX24117_REG_FREQ1_0      (0x36)
+#define CX24117_REG_STATE0       (0x39)
+#define CX24117_REG_SSTATUS0     (0x3a)      /* demod0 signal high / status */
+#define CX24117_REG_SIGNAL0      (0x3b)
+#define CX24117_REG_FREQ5_0      (0x3c)      /* +-freq */
+#define CX24117_REG_FREQ6_0      (0x3d)
+#define CX24117_REG_SRATE2_0     (0x3e)      /* +- 1000 * srate */
+#define CX24117_REG_SRATE1_0     (0x3f)
+#define CX24117_REG_QUALITY2_0   (0x40)
+#define CX24117_REG_QUALITY1_0   (0x41)
+
+#define CX24117_REG_BER4_0       (0x47)
+#define CX24117_REG_BER3_0       (0x48)
+#define CX24117_REG_BER2_0       (0x49)
+#define CX24117_REG_BER1_0       (0x4a)
+#define CX24117_REG_DVBS_UCB2_0  (0x4b)
+#define CX24117_REG_DVBS_UCB1_0  (0x4c)
+#define CX24117_REG_DVBS2_UCB2_0 (0x50)
+#define CX24117_REG_DVBS2_UCB1_0 (0x51)
+#define CX24117_REG_QSTATUS0     (0x93)
+#define CX24117_REG_CLKDIV0      (0xe6)
+#define CX24117_REG_RATEDIV0     (0xf0)
 
 
-#define CX24117_REG_FREQ3_0    (0x34) /* freq */
-#define CX24117_REG_FREQ2_0    (0x35)
-#define CX24117_REG_FREQ1_0    (0x36)
-#define CX24117_REG_STATE0     (0x39)
-#define CX24117_REG_SSTATUS0   (0x3a)      /* demod0 signal high / status */
-#define CX24117_REG_SIGNAL0    (0x3b)
-#define CX24117_REG_FREQ5_0    (0x3c)      /* +-freq */
-#define CX24117_REG_FREQ6_0    (0x3d)
-#define CX24117_REG_SRATE2_0   (0x3e)      /* +- 1000 * srate */
-#define CX24117_REG_SRATE1_0   (0x3f)
-#define CX24117_REG_QUALITYH0  (0x40)
-#define CX24117_REG_QUALITYL0  (0x41)
-#define CX24117_REG_BER0       (0x4a)
-#define CX24117_REG_DVBS_UCB0  (0x4c)
-#define CX24117_REG_DVBS2_UCB0 (0x51)
-#define CX24117_REG_QSTATUS0   (0x93)
-#define CX24117_REG_CLKDIV0    (0xe6)
-#define CX24117_REG_RATEDIV0   (0xf0)
-
-
-#define CX24117_REG_FREQ3_1    (0x55) /* freq */
-#define CX24117_REG_FREQ2_1    (0x56)
-#define CX24117_REG_FREQ1_1    (0x57)
-#define CX24117_REG_STATE1     (0x5a)
-#define CX24117_REG_SSTATUS1   (0x5b)      /* demod1 signal high / status */
-#define CX24117_REG_SIGNAL1    (0x5c)
-#define CX24117_REG_FREQ5_1    (0x5d) /* +- freq */
-#define CX24117_REG_FREQ4_1    (0x5e)
-#define CX24117_REG_SRATE2_1   (0x5f)
-#define CX24117_REG_SRATE1_1   (0x60)
-#define CX24117_REG_QUALITYH1  (0x61)
-#define CX24117_REG_QUALITYL1  (0x62)
-#define CX24117_REG_BER1       (0x6b)
-#define CX24117_REG_DVBS_UCB1  (0x6d)
-#define CX24117_REG_DVBS2_UCB1 (0x72)
-#define CX24117_REG_QSTATUS1   (0x9f)
-#define CX24117_REG_CLKDIV1    (0xe7)
-#define CX24117_REG_RATEDIV1   (0xf1)
+#define CX24117_REG_FREQ3_1      (0x55)      /* frequency */
+#define CX24117_REG_FREQ2_1      (0x56)
+#define CX24117_REG_FREQ1_1      (0x57)
+#define CX24117_REG_STATE1       (0x5a)
+#define CX24117_REG_SSTATUS1     (0x5b)      /* demod1 signal high / status */
+#define CX24117_REG_SIGNAL1      (0x5c)
+#define CX24117_REG_FREQ5_1      (0x5d)      /* +- freq */
+#define CX24117_REG_FREQ4_1      (0x5e)
+#define CX24117_REG_SRATE2_1     (0x5f)
+#define CX24117_REG_SRATE1_1     (0x60)
+#define CX24117_REG_QUALITY2_1   (0x61)
+#define CX24117_REG_QUALITY1_1   (0x62)
+#define CX24117_REG_BER4_1       (0x68)
+#define CX24117_REG_BER3_1       (0x69)
+#define CX24117_REG_BER2_1       (0x6a)
+#define CX24117_REG_BER1_1       (0x6b)
+#define CX24117_REG_DVBS_UCB2_1  (0x6c)
+#define CX24117_REG_DVBS_UCB1_1  (0x6d)
+#define CX24117_REG_DVBS2_UCB2_1 (0x71)
+#define CX24117_REG_DVBS2_UCB1_1 (0x72)
+#define CX24117_REG_QSTATUS1     (0x9f)
+#define CX24117_REG_CLKDIV1      (0xe7)
+#define CX24117_REG_RATEDIV1     (0xf1)
 
 
 /* arg buffer size */
@@ -129,8 +139,6 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 #define CX24117_PNE	(0) /* 0 disabled / 2 enabled */
 #define CX24117_OCC	(1) /* 0 disabled / 1 enabled */
 
-
-#define dprintk
 
 enum cmds {
 	CMD_SET_VCO     = 0x10,
@@ -320,6 +328,29 @@ static int cx24117_readreg(struct cx24117_state *state, u8 reg)
 		__func__, state->demod, reg, recv);
 
 	return recv;
+}
+
+static int cx24117_readregN(struct cx24117_state *state,
+	u8 reg, u8 *buf, int len)
+{
+	int ret;
+	struct i2c_msg msg[] = {
+		{ .addr = state->priv->demod_address, .flags = 0,
+			.buf = &reg, .len = 1 },
+		{ .addr = state->priv->demod_address, .flags = I2C_M_RD,
+			.buf = buf, .len = len }
+	};
+
+	ret = i2c_transfer(state->priv->i2c, msg, 2);
+
+	if (ret != 2) {
+		dev_warn(&state->priv->i2c->dev,
+			"%s: demod%d i2c rd err(%d) @0x%x\n",
+			KBUILD_MODNAME, state->demod, ret, reg);
+		return -EREMOTEIO;
+	}
+
+	return 0;
 }
 
 static int cx24117_set_inversion(struct cx24117_state *state,
@@ -530,7 +561,8 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d " \
 		"Firmware is %zu bytes (%02x %02x .. %02x %02x)\n",
 		__func__, state->demod, fw->size,
-		fw->data[0], fw->data[1], fw->data[fw->size-2], fw->data[fw->size-1]);
+		fw->data[0], fw->data[1],
+		fw->data[fw->size-2], fw->data[fw->size-1]);
 
 	cx24117_writereg(state, 0xea, 0x00);
 	cx24117_writereg(state, 0xea, 0x01);
@@ -724,12 +756,10 @@ static int cx24117_read_status(struct dvb_frontend *fe, fe_status_t *status)
 	struct cx24117_state *state = fe->demodulator_priv;
 	int lock;
 
-	mutex_lock(&state->priv->fe_lock);
 	lock = cx24117_readreg(state,
 		(state->demod == 0) ? CX24117_REG_SSTATUS0 :
 				      CX24117_REG_SSTATUS1 ) & 
 		CX24117_STATUS_MASK;
-	mutex_unlock(&state->priv->fe_lock);
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d status = 0x%02x\n",
 		__func__, state->demod, lock);
@@ -751,16 +781,18 @@ static int cx24117_read_status(struct dvb_frontend *fe, fe_status_t *status)
 static int cx24117_read_ber(struct dvb_frontend *fe, u32 *ber)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
+	int ret;
+	u8 buf[4];
 	u8 base_reg = (state->demod == 0) ?
-			CX24117_REG_BER0 :
-			CX24117_REG_BER1;
+			CX24117_REG_BER4_0 :
+			CX24117_REG_BER4_1;
 
-	mutex_lock(&state->priv->fe_lock);
-	*ber =  (cx24117_readreg(state, base_reg-3) << 24) |
-		(cx24117_readreg(state, base_reg-2) << 16) |
-		(cx24117_readreg(state, base_reg-1)  << 8)  |
-		 cx24117_readreg(state, base_reg);
-	mutex_unlock(&state->priv->fe_lock);
+	ret = cx24117_readregN(state, base_reg, buf, 4);
+	if (ret != 0)
+		return ret;
+
+	*ber = (buf[0] << 24) | (buf[1] << 16) |
+		(buf[1] << 8) | buf[0];
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ber=0x%04x\n",
 		__func__, state->demod, *ber);
@@ -775,22 +807,22 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 	struct cx24117_cmd cmd;
 	int ret;
 	u16 sig_reading;
+	u8 buf[2];
+	u8 reg = (state->demod == 0) ?
+		CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1;
 
 	/* Firmware CMD 1A */
 	cmd.args[0] = 0x1a;
 	cmd.args[1] = (u8) state->demod;
 	cmd.len = 2;
-	mutex_lock(&state->priv->fe_lock);
-	ret = cx24117_cmd_execute_nolock(fe, &cmd);
+	ret = cx24117_cmd_execute(fe, &cmd);
 	if (ret != 0)
 		return ret;
 
-	sig_reading = ((cx24117_readreg(state, (state->demod == 0) ?
-			  CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
-			  CX24117_SIGNAL_MASK) << 2) | 
-			cx24117_readreg(state, (state->demod == 0) ?
-			  CX24117_REG_SIGNAL0 : CX24117_REG_SIGNAL1);
-	mutex_unlock(&state->priv->fe_lock);
+	ret = cx24117_readregN(state, reg, buf, 2);
+	if (ret != 0)
+		return ret;
+	sig_reading = ((buf[0] & CX24117_SIGNAL_MASK) << 2) | buf[1];
 
 	*signal_strength = -100 * sig_reading + 94324;
 
@@ -804,18 +836,16 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 static int cx24117_read_snr(struct dvb_frontend *fe, u16 *snr)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
-	int ret = 0;
+	int ret;
 	u16 snr_reading;
+	u8 buf[2];
+	u8 reg = (state->demod == 0) ?
+		CX24117_REG_QUALITY2_0 : CX24117_REG_QUALITY2_1;
 
-	u8 reg_h = (state->demod == 0) ?
-		CX24117_REG_QUALITYH0 : CX24117_REG_QUALITYH1;
-	u8 reg_l = (state->demod == 0) ?
-		CX24117_REG_QUALITYL0 : CX24117_REG_QUALITYL1;
-
-	mutex_lock(&state->priv->fe_lock);
-	snr_reading = cx24117_readreg(state, reg_h) << 8 |
-		      cx24117_readreg(state, reg_l);
-	mutex_unlock(&state->priv->fe_lock);
+	ret = cx24117_readregN(state, reg, buf, 2);
+	if (ret != 0)
+		return ret;
+	snr_reading = (buf[0] << 8) | buf[1];
 
 	/* display in percentage */
 	if (esno_snr == 1) {
@@ -838,27 +868,26 @@ static int cx24117_read_ucblocks(struct dvb_frontend *fe, u32 *ucblocks)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	fe_delivery_system_t delsys = fe->dtv_property_cache.delivery_system;
-	u8 base_reg;
+	int ret;
+	u8 buf[2];
+	u8 reg = (state->demod == 0) ?
+		CX24117_REG_DVBS_UCB2_0 :
+		CX24117_REG_DVBS_UCB2_1;
 
 	switch (delsys) {
 	case SYS_DVBS:
-		base_reg = (state->demod == 0) ?
-				CX24117_REG_DVBS_UCB0 :
-				CX24117_REG_DVBS_UCB1;
 		break;
 	case SYS_DVBS2:
-		base_reg = (state->demod == 0) ?
-				CX24117_REG_DVBS2_UCB0 :
-				CX24117_REG_DVBS2_UCB1;
+		reg += (CX24117_REG_DVBS2_UCB2_0 - CX24117_REG_DVBS_UCB2_0);
 		break;
 	default:
-		return 1;
+		return -EOPNOTSUPP;
 	}
 
-	mutex_lock(&state->priv->fe_lock);
-	*ucblocks = (cx24117_readreg(state, base_reg-1) << 8) |
-		     cx24117_readreg(state, base_reg);
-	mutex_unlock(&state->priv->fe_lock);
+	ret = cx24117_readregN(state, reg, buf, 2);
+	if (ret != 0)
+		return ret;
+	*ucblocks = (buf[0] << 8) | buf[1];
 
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d ucb=0x%04x\n",
 		__func__, state->demod, *ucblocks);
@@ -886,9 +915,7 @@ static int cx24117_wait_for_lnb(struct dvb_frontend *fe)
 
 	/* Wait for up to 300 ms */
 	for (i = 0; i < 10 ; i++) {
-		mutex_lock(&state->priv->fe_lock);
 		val = cx24117_readreg(state, reg) & 0x01;
-		mutex_unlock(&state->priv->fe_lock);
 		if (val != 0)
 			return 0;
 		msleep(30);
@@ -1455,19 +1482,16 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 	cmd.args[13] = reg_ratediv;
 	cmd.args[14] = reg_clkdiv;
 
-	mutex_lock(&state->priv->fe_lock);
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_CLKDIV0 : CX24117_REG_CLKDIV1, reg_clkdiv);
 	cx24117_writereg(state, (state->demod == 0) ?
 		CX24117_REG_RATEDIV0 : CX24117_REG_RATEDIV1, reg_ratediv);
-	mutex_unlock(&state->priv->fe_lock);
 
 	cmd.args[15] = CX24117_PNE;
 	cmd.len = 16;
 
 	do {
 		/* Reset status register */
-		mutex_lock(&state->priv->fe_lock);
 		status = cx24117_readreg(state, (state->demod == 0) ?
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1) &
 			CX24117_SIGNAL_MASK;
@@ -1480,8 +1504,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 			CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1, status);
 
 		/* Tune */
-		ret = cx24117_cmd_execute_nolock(fe, &cmd);
-		mutex_unlock(&state->priv->fe_lock);
+		ret = cx24117_cmd_execute(fe, &cmd);
 		if (ret != 0)
 			break;
 
@@ -1522,14 +1545,6 @@ static int cx24117_tune(struct dvb_frontend *fe, bool re_tune,
 	dev_dbg(&state->priv->i2c->dev, "%s() demod%d\n",
 		__func__, state->demod);
 
-	/*
-	 * It is safe to discard "params" here, as the DVB core will sync
-	 * fe->dtv_property_cache with fepriv->parameters_in, where the
-	 * DVBv3 params are stored. The only practical usage for it indicate
-	 * that re-tuning is needed, e. g. (fepriv->state & FESTATE_RETUNE) is
-	 * true.
-	 */
-
 	*delay = HZ / 5;
 	if (re_tune) {
 		int ret = cx24117_set_frontend(fe);
@@ -1554,18 +1569,23 @@ static int cx24117_get_frontend(struct dvb_frontend *fe)
 	unsigned int freq;
 	short srate_os, freq_os;
 
+	u8 buf[0x1f-4];
+
 	cmd.args[0] = 0x1c;
 	cmd.args[1] = (u8) state->demod;
 	cmd.len = 2;
-	mutex_lock(&state->priv->fe_lock);
-	ret = cx24117_cmd_execute_nolock(fe, &cmd);
+	ret = cx24117_cmd_execute(fe, &cmd);
 	if (ret != 0)
 		return ret;
 
-	reg = (state->demod == 0) ?
-		CX24117_REG_STATE0 : CX24117_REG_STATE1;
-	st = cx24117_readreg(state, reg);
+	/* read all required regs at once */
+	
+	reg = (state->demod == 0) ? CX24117_REG_FREQ3_0 : CX24117_REG_FREQ3_1;
+	ret = cx24117_readregN(state, reg, buf, 0x1f-4);
+	if (ret != 0)
+		return ret;
 
+	st = buf[5];
 	//printk("%s() demod%d reg 0x5a = %02x\n", __func__, state->demod, st);
 
 	/* get spectral inversion */
@@ -1589,24 +1609,13 @@ static int cx24117_get_frontend(struct dvb_frontend *fe)
 	c->fec_inner = CX24117_MODFEC_MODES[idx].fec;
 	
 	/* frequency */
-	reg = (state->demod == 0) ?
-		CX24117_REG_FREQ3_0 : CX24117_REG_FREQ3_1;
-	freq = (cx24117_readreg(state, reg) << 16) |
-		(cx24117_readreg(state, reg+1) << 8) |
-		cx24117_readreg(state, reg+2);
-	reg = (state->demod == 0) ?
-		CX24117_REG_FREQ5_0 : CX24117_REG_FREQ5_1;
-	freq_os = (cx24117_readreg(state, reg) << 8) | 
-		cx24117_readreg(state, reg+1);
+	freq = (buf[0] << 16) | (buf[1] << 8) | buf[2];
+	freq_os = (buf[8] << 8) | buf[9];
 	c->frequency = freq + freq_os;
 
 	/* symbol rate */
-	reg = (state->demod == 0) ?
-		CX24117_REG_SRATE2_0 : CX24117_REG_SRATE2_1;
-	srate_os = (cx24117_readreg(state, reg) << 8) |
-		 cx24117_readreg(state, reg+1);
+	srate_os = (buf[10] << 8) | buf[11];
 	c->symbol_rate = -1000*srate_os + state->dcur.symbol_rate;
-	mutex_unlock(&state->priv->fe_lock);
 	return 0;
 }
 
