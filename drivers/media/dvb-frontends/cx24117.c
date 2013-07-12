@@ -47,8 +47,17 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 #define CX24117_REG_COMMAND    (0x00)      /* command buffer */
 #define CX24117_REG_EXECUTE    (0x1f)      /* execute command */
 
+
+#define CX24117_REG_FREQ3_0    (0x34) /* freq */
+#define CX24117_REG_FREQ2_0    (0x35)
+#define CX24117_REG_FREQ1_0    (0x36)
+#define CX24117_REG_STATE0     (0x39)
 #define CX24117_REG_SSTATUS0   (0x3a)      /* demod0 signal high / status */
 #define CX24117_REG_SIGNAL0    (0x3b)
+#define CX24117_REG_FREQ5_0    (0x3c)      /* +-freq */
+#define CX24117_REG_FREQ6_0    (0x3d)
+#define CX24117_REG_SRATE2_0   (0x3e)      /* +- 1000 * srate */
+#define CX24117_REG_SRATE1_0   (0x3f)
 #define CX24117_REG_QUALITYH0  (0x40)
 #define CX24117_REG_QUALITYL0  (0x41)
 #define CX24117_REG_BER0       (0x4a)
@@ -58,8 +67,17 @@ MODULE_PARM_DESC(esno_snr, "SNR return units, 0=ESNO(db * 10), "\
 #define CX24117_REG_CLKDIV0    (0xe6)
 #define CX24117_REG_RATEDIV0   (0xf0)
 
+
+#define CX24117_REG_FREQ3_1    (0x55) /* freq */
+#define CX24117_REG_FREQ2_1    (0x56)
+#define CX24117_REG_FREQ1_1    (0x57)
+#define CX24117_REG_STATE1     (0x5a)
 #define CX24117_REG_SSTATUS1   (0x5b)      /* demod1 signal high / status */
 #define CX24117_REG_SIGNAL1    (0x5c)
+#define CX24117_REG_FREQ5_1    (0x5d) /* +- freq */
+#define CX24117_REG_FREQ4_1    (0x5e)
+#define CX24117_REG_SRATE2_1   (0x5f)
+#define CX24117_REG_SRATE1_1   (0x60)
 #define CX24117_REG_QUALITYH1  (0x61)
 #define CX24117_REG_QUALITYL1  (0x62)
 #define CX24117_REG_BER1       (0x6b)
@@ -1526,6 +1544,72 @@ static int cx24117_get_algo(struct dvb_frontend *fe)
 	return DVBFE_ALGO_HW;
 }
 
+static int cx24117_get_frontend(struct dvb_frontend *fe)
+{
+	struct cx24117_state *state = fe->demodulator_priv;
+	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+	struct cx24117_cmd cmd;
+	u8 reg, st, inv;
+	int ret, idx;
+	unsigned int freq;
+	short srate_os, freq_os;
+
+	cmd.args[0] = 0x1c;
+	cmd.args[1] = (u8) state->demod;
+	cmd.len = 2;
+	mutex_lock(&state->priv->fe_lock);
+	ret = cx24117_cmd_execute_nolock(fe, &cmd);
+	if (ret != 0)
+		return ret;
+
+	reg = (state->demod == 0) ?
+		CX24117_REG_STATE0 : CX24117_REG_STATE1;
+	st = cx24117_readreg(state, reg);
+
+	//printk("%s() demod%d reg 0x5a = %02x\n", __func__, state->demod, st);
+
+	/* get spectral inversion */
+	inv = (((state->demod == 0) ? ~st : st) >> 6) & 1;
+	if (inv == 0)
+		c->inversion = INVERSION_OFF;
+	else
+		c->inversion = INVERSION_ON;
+
+	/* modulation and fec */
+	idx = st & 0x3f;
+	if (c->delivery_system == SYS_DVBS2) {
+		if (idx > 11)
+			idx += 9;
+		else
+			idx += 7;
+	}
+
+	//c->delivery_system = CX24117_MODFEC_MODES[idx].delivery_system;
+	c->modulation = CX24117_MODFEC_MODES[idx].modulation;
+	c->fec_inner = CX24117_MODFEC_MODES[idx].fec;
+	
+	/* frequency */
+	reg = (state->demod == 0) ?
+		CX24117_REG_FREQ3_0 : CX24117_REG_FREQ3_1;
+	freq = (cx24117_readreg(state, reg) << 16) |
+		(cx24117_readreg(state, reg+1) << 8) |
+		cx24117_readreg(state, reg+2);
+	reg = (state->demod == 0) ?
+		CX24117_REG_FREQ5_0 : CX24117_REG_FREQ5_1;
+	freq_os = (cx24117_readreg(state, reg) << 8) | 
+		cx24117_readreg(state, reg+1);
+	c->frequency = freq + freq_os;
+
+	/* symbol rate */
+	reg = (state->demod == 0) ?
+		CX24117_REG_SRATE2_0 : CX24117_REG_SRATE2_1;
+	srate_os = (cx24117_readreg(state, reg) << 8) |
+		 cx24117_readreg(state, reg+1);
+	c->symbol_rate = -1000*srate_os + state->dcur.symbol_rate;
+	mutex_unlock(&state->priv->fe_lock);
+	return 0;
+}
+
 static struct dvb_frontend_ops cx24117_ops = {
 	.delsys = { SYS_DVBS, SYS_DVBS2 },
 	.info = {
@@ -1561,6 +1645,7 @@ static struct dvb_frontend_ops cx24117_ops = {
 	.tune = cx24117_tune,
 
 	.set_frontend = cx24117_set_frontend,
+	.get_frontend = cx24117_get_frontend,
 };
 
 
