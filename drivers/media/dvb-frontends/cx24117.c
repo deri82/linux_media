@@ -5,7 +5,8 @@
 	July, 6th 2013
 	    First release based on cx24116 driver by:
 	    Steven Toth and Georg Acher, Darron Broad, Igor Liplianin
-            Cards currently using this demod/tuner:
+            Cards currently supported:
+		TBS6980 - Dual DVBS/S2 PCIe card
 		TBS6981 - Dual DVBS/S2 PCIe card
 
     This program is free software; you can redistribute it and/or modify
