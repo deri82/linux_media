@@ -1054,15 +1054,18 @@ static void tbs_card_init(struct cx23885_dev *dev)
 	case CX23885_BOARD_TBS_6980:
 	case CX23885_BOARD_TBS_6981:
 		cx_set(GP0_IO, 0x00070007);
-		mdelay(1);
+		msleep(1);
 		cx_clear(GP0_IO, 2);
-		mdelay(1);
+		msleep(1);
 		/* send init bitstream */
-		for (i=0; i<9 * 8; i++) {
+		/* the bitstream is sent in a bitbanged spi */
+		/* attached to cx23995 GPIO port */
+		for (i = 0; i < 9 * 8; i++) {
 			cx_clear(GP0_IO, 7);
-			udelay(100);
-			cx_set(GP0_IO, ((buf[i>>3]>>(7-(i&7)))&1)|4);
-			udelay(100);
+			msleep(1);
+			cx_set(GP0_IO,
+				((buf[i >> 3] >> (7 - (i & 7))) & 1) | 4);
+			msleep(1);
 		}
 		cx_set(GP0_IO, 7);
 		break;
