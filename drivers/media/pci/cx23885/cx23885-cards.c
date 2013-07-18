@@ -1043,8 +1043,6 @@ static void hauppauge_eeprom(struct cx23885_dev *dev, u8 *eeprom_data)
 /* TBS cards init */
 static void tbs_card_init(struct cx23885_dev *dev)
 {
-	char buffer[2];
-	struct i2c_msg msg;
 	int i;
 	const u8 buf[] = {
 		0xe0, 0x06, 0x66, 0x33, 0x65,
@@ -1072,8 +1070,8 @@ static void tbs_card_init(struct cx23885_dev *dev)
 	}
 
 	/* clear any pending audio ADC interrupts */
-	cx23885_flatiron_write(dev, 0x1f, 0x80);
-	cx23885_flatiron_write(dev, 0x23, 0x80);
+	//cx23885_flatiron_write(dev, 0x1f, 0x80);
+	//cx23885_flatiron_write(dev, 0x23, 0x80);
 }
 
 int cx23885_tuner_callback(void *priv, int component, int command, int arg)

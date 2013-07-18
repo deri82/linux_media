@@ -29,8 +29,25 @@ void cx23885_av_work_handler(struct work_struct *work)
 	struct cx23885_dev *dev =
 			   container_of(work, struct cx23885_dev, cx25840_work);
 	bool handled;
+	char buffer[2];
+	struct i2c_msg msg = {
+		.addr = 0x98 >> 1,
+		.flags = 0,
+		.len = 2,
+		.buf = buffer,
+	};
 
 	v4l2_subdev_call(dev->sd_cx25840, core, interrupt_service_routine,
 			 PCI_MSK_AV_CORE, &handled);
+
+	if (!handled) {
+		/* clear any pending flatiron interrupts */
+		buffer[0] = 0x1f;
+		buffer[1] = 0x80;
+		i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
+		buffer[0] = 0x23;
+		i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
+	}
+
 	cx23885_irq_enable(dev, PCI_MSK_AV_CORE);
 }
