@@ -1071,20 +1071,9 @@ static void tbs_card_init(struct cx23885_dev *dev)
 		break;
 	}
 
-	/* unknonw i2c init */
-	/* stops the IR interrupt storm */
-	msg.addr = 0x4c;
-	msg.flags = 0;
-	msg.len = 2;
-	msg.buf = buffer;
-
-	buffer[0] = 0x1f;
-	buffer[1] = 0x80;
-	i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
-
-	buffer[0] = 0x23;
-	buffer[1] = 0x80;
-	i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
+	/* clear any pending audio ADC interrupts */
+	cx23885_flatiron_write(dev, 0x1f, 0x80);
+	cx23885_flatiron_write(dev, 0x23, 0x80);
 }
 
 int cx23885_tuner_callback(void *priv, int component, int command, int arg)
