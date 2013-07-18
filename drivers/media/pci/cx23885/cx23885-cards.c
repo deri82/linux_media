@@ -1040,9 +1040,11 @@ static void hauppauge_eeprom(struct cx23885_dev *dev, u8 *eeprom_data)
 			dev->name, tv.model);
 }
 
-/* some TBS cards require init */
+/* TBS cards init */
 static void tbs_card_init(struct cx23885_dev *dev)
 {
+	char buffer[2];
+	struct i2c_msg msg;
 	int i;
 	const u8 buf[] = {
 		0xe0, 0x06, 0x66, 0x33, 0x65,
@@ -1065,6 +1067,21 @@ static void tbs_card_init(struct cx23885_dev *dev)
 		cx_set(GP0_IO, 7);
 		break;
 	}
+
+	/* unknonw i2c init */
+	/* stops the IR interrupt storm */
+	msg.addr = 0x4c;
+	msg.flags = 0;
+	msg.len = 2;
+	msg.buf = buffer;
+
+	buffer[0] = 0x1f;
+	buffer[1] = 0x80;
+	i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
+
+	buffer[0] = 0x23;
+	buffer[1] = 0x80;
+	i2c_transfer(&dev->i2c_bus[2].i2c_adap, &msg, 1);
 }
 
 int cx23885_tuner_callback(void *priv, int component, int command, int arg)
