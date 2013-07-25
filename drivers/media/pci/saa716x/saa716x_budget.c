@@ -23,6 +23,8 @@
 #include "saa716x_gpio_reg.h"
 #include "saa716x_greg_reg.h"
 #include "saa716x_msi_reg.h"
+#include "saa716x_dma_reg.h"
+#include "saa716x_vip_reg.h"
 
 #include "saa716x_adap.h"
 #include "saa716x_i2c.h"
@@ -36,6 +38,9 @@
 #include "mb86a16.h"
 #include "stv6110x.h"
 #include "stv090x.h"
+
+#include "cx24117.h"
+#include "isl6423.h"
 
 unsigned int verbose;
 module_param(verbose, int, 0644);
@@ -627,6 +632,208 @@ static struct saa716x_config skystar2_express_hd_config = {
 	}
 };
 
+static irqreturn_t saa716x_tbs6984_pci_irq(int irq, void *dev_id)
+{
+	struct saa716x_dev *saa716x	= (struct saa716x_dev *) dev_id;
+
+	u32 stat_h, stat_l, mask_h, mask_l;
+	u32 fgpiStatus;
+	u32 activeBuffer;
+
+	if (unlikely(saa716x == NULL)) {
+		printk("%s: saa716x=NULL", __func__);
+		return IRQ_NONE;
+	}
+
+	stat_l = SAA716x_EPRD(MSI, MSI_INT_STATUS_L);
+	stat_h = SAA716x_EPRD(MSI, MSI_INT_STATUS_H);
+	mask_l = SAA716x_EPRD(MSI, MSI_INT_ENA_L);
+	mask_h = SAA716x_EPRD(MSI, MSI_INT_ENA_H);
+
+	dprintk(SAA716x_DEBUG, 1, "MSI STAT L=<%02x> H=<%02x>, CTL L=<%02x> H=<%02x>",
+		stat_l, stat_h, mask_l, mask_h);
+
+	if (!((stat_l & mask_l) || (stat_h & mask_h)))
+		return IRQ_NONE;
+
+	if (stat_l)
+		SAA716x_EPWR(MSI, MSI_INT_STATUS_CLR_L, stat_l);
+
+	if (stat_h)
+		SAA716x_EPWR(MSI, MSI_INT_STATUS_CLR_H, stat_h);
+#if 0
+	if (enable_ir) {
+		if (stat_h & MSI_INT_EXTINT_4)
+			saa716x_input_irq_handler(saa716x);
+	}
+#endif
+	if (stat_l) {
+		if (stat_l & MSI_INT_TAGACK_FGPI_0) {
+
+			fgpiStatus = SAA716x_EPRD(FGPI0, INT_STATUS);
+			activeBuffer = (SAA716x_EPRD(BAM, BAM_FGPI0_DMA_BUF_MODE) >> 3) & 0x7;
+			dprintk(SAA716x_DEBUG, 1, "fgpiStatus = %04X, buffer = %d",
+				fgpiStatus, activeBuffer);
+			if (activeBuffer > 0)
+				activeBuffer -= 1;
+			else
+				activeBuffer = 7;
+			if (saa716x->fgpi[0].dma_buf[activeBuffer].mem_virt) {
+				u8 * data = (u8 *)saa716x->fgpi[0].dma_buf[activeBuffer].mem_virt;
+				dprintk(SAA716x_DEBUG, 1, "%02X%02X%02X%02X",
+					data[0], data[1], data[2], data[3]);
+				dvb_dmx_swfilter_packets(&saa716x->saa716x_adap[2].demux, data, 348);
+			}
+			if (fgpiStatus) {
+				SAA716x_EPWR(FGPI0, INT_CLR_STATUS, fgpiStatus);
+			}
+		}
+		if (stat_l & MSI_INT_TAGACK_FGPI_1) {
+
+			fgpiStatus = SAA716x_EPRD(FGPI1, INT_STATUS);
+			activeBuffer = (SAA716x_EPRD(BAM, BAM_FGPI1_DMA_BUF_MODE) >> 3) & 0x7;
+			dprintk(SAA716x_DEBUG, 1, "fgpiStatus = %04X, buffer = %d",
+				fgpiStatus, activeBuffer);
+			if (activeBuffer > 0)
+				activeBuffer -= 1;
+			else
+				activeBuffer = 7;
+			if (saa716x->fgpi[1].dma_buf[activeBuffer].mem_virt) {
+				u8 * data = (u8 *)saa716x->fgpi[1].dma_buf[activeBuffer].mem_virt;
+				dprintk(SAA716x_DEBUG, 1, "%02X%02X%02X%02X",
+					data[0], data[1], data[2], data[3]);
+				dvb_dmx_swfilter_packets(&saa716x->saa716x_adap[3].demux, data, 348);
+			}
+                        if (fgpiStatus) {
+				SAA716x_EPWR(FGPI1, INT_CLR_STATUS, fgpiStatus);
+			}
+		}
+		if (stat_l & MSI_INT_TAGACK_FGPI_2) {
+
+			fgpiStatus = SAA716x_EPRD(FGPI2, INT_STATUS);
+			activeBuffer = (SAA716x_EPRD(BAM, BAM_FGPI2_DMA_BUF_MODE) >> 3) & 0x7;
+			dprintk(SAA716x_DEBUG, 1, "fgpiStatus = %04X, buffer = %d",
+				fgpiStatus, activeBuffer);
+			if (activeBuffer > 0)
+				activeBuffer -= 1;
+			else
+				activeBuffer = 7;
+			if (saa716x->fgpi[2].dma_buf[activeBuffer].mem_virt) {
+				u8 * data = (u8 *)saa716x->fgpi[2].dma_buf[activeBuffer].mem_virt;
+				dprintk(SAA716x_DEBUG, 1, "%02X%02X%02X%02X",
+					data[0], data[1], data[2], data[3]);
+				dvb_dmx_swfilter_packets(&saa716x->saa716x_adap[0].demux, data, 348);
+			}
+			if (fgpiStatus) {
+				SAA716x_EPWR(FGPI2, INT_CLR_STATUS, fgpiStatus);
+			}
+		}
+		if (stat_l & MSI_INT_TAGACK_FGPI_3) {
+			
+			fgpiStatus = SAA716x_EPRD(FGPI3, INT_STATUS);
+			activeBuffer = (SAA716x_EPRD(BAM, BAM_FGPI3_DMA_BUF_MODE) >> 3) & 0x7;
+			dprintk(SAA716x_DEBUG, 1, "fgpiStatus = %04X, buffer = %d",
+				fgpiStatus, activeBuffer);
+				if (activeBuffer > 0)
+					activeBuffer -= 1;
+					else
+						activeBuffer = 7;
+				if (saa716x->fgpi[3].dma_buf[activeBuffer].mem_virt) {
+						u8 * data = (u8 *)saa716x->fgpi[3].dma_buf[activeBuffer].mem_virt;
+						dprintk(SAA716x_DEBUG, 1, "%02X%02X%02X%02X",
+							data[0], data[1], data[2], data[3]);
+					dvb_dmx_swfilter_packets(&saa716x->saa716x_adap[1].demux, data, 348);
+				}
+				if (fgpiStatus) {
+					SAA716x_EPWR(FGPI3, INT_CLR_STATUS, fgpiStatus);
+					}
+				}
+	}
+
+	saa716x_msi_event(saa716x, stat_l, stat_h);
+
+	return IRQ_HANDLED;
+}
+
+#define SAA716x_MODEL_TURBOSIGHT_TBS6984 "TurboSight TBS 6984"
+#define SAA716x_DEV_TURBOSIGHT_TBS6984   "DVB-S2"
+
+static struct cx24117_config tbs_cx24117_config[] = {
+	{
+		.demod_address = 0x55,
+	},
+	{
+		.demod_address = 0x05,
+	},
+};
+
+static struct isl6423_config tbs_isl6423_config = {
+	.current_max            = SEC_CURRENT_515m,
+	.curlim                 = SEC_CURRENT_LIM_ON,
+	.mod_extern             = 1,
+	.addr                   = 0x08,
+};
+
+static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int count)
+{
+	struct saa716x_dev *saa716x = adapter->saa716x;
+	struct saa716x_i2c *i2c0 = &saa716x->i2c[0];
+	struct saa716x_i2c *i2c1 = &saa716x->i2c[1];
+
+	printk("CX24117 frontend %d attaching.\n", count);
+
+	switch (count) {
+	case 0:
+		/* first FE attaching */
+		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
+					&i2c1->i2c_adapter, NULL);
+		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
+			&tbs_isl6423_config);
+		break;
+	case 1:
+	case 2:
+	case 3:
+	default:
+		break;
+	}
+
+	if (!adapter->fe) 
+		goto exit;
+
+	return 0;
+exit:
+	dprintk(SAA716x_ERROR, 1, "Frontend attach failed");
+	return -ENODEV;
+}
+
+static struct saa716x_config saa716x_tbs6984_config = {
+	.model_name		= SAA716x_MODEL_TURBOSIGHT_TBS6984,
+	.dev_type		= SAA716x_DEV_TURBOSIGHT_TBS6984,
+	.boot_mode		= SAA716x_EXT_BOOT,
+	.adapters		= 4,
+	.frontend_attach	= saa716x_tbs6984_frontend_attach,
+	.irq_handler		= saa716x_tbs6984_pci_irq,
+	.i2c_rate		= SAA716x_I2C_RATE_400,
+	.adap_config		= {
+		{
+			/* adapter 0 */
+			.ts_port = 2
+		},
+		{
+			/* adapter 1 */
+			.ts_port = 3
+		},
+		{
+			/* adapter 2 */
+			.ts_port = 0
+		},
+		{
+			/* adapter 3 */
+			.ts_port = 1
+		}
+	}
+};
+
 
 static struct pci_device_id saa716x_budget_pci_table[] = {
 
@@ -635,6 +842,9 @@ static struct pci_device_id saa716x_budget_pci_table[] = {
 	MAKE_ENTRY(TWINHAN_TECHNOLOGIES, TWINHAN_VP_6002, SAA7160, &saa716x_vp6002_config), /* VP-6002 */
 	MAKE_ENTRY(KNC_One, KNC_Dual_S2, SAA7160, &saa716x_knc1_duals2_config),
 	MAKE_ENTRY(TECHNISAT, SKYSTAR2_EXPRESS_HD, SAA7160, &skystar2_express_hd_config),
+
+	MAKE_ENTRY(TURBOSIGHT_TBS6984_SUBVENDOR, TURBOSIGHT_TBS6984_SUBDEVICE, SAA7160, &saa716x_tbs6984_config),
+
 	{ }
 };
 MODULE_DEVICE_TABLE(pci, saa716x_budget_pci_table);
