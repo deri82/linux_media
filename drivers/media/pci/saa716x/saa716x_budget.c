@@ -52,6 +52,15 @@ MODULE_PARM_DESC(int_type, "force Interrupt Handler type: 0=INT-A, 1=MSI, 2=MSI-
 
 #define DRIVER_NAME	"SAA716x Budget"
 
+
+static int saa716x_card_init(struct saa716x_dev *saa716x)
+{
+
+
+
+}
+
+
 static int saa716x_budget_pci_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 {
 	struct saa716x_dev *saa716x;
@@ -107,7 +116,7 @@ static int saa716x_budget_pci_probe(struct pci_dev *pdev, const struct pci_devic
 	}
 
 	saa716x_gpio_init(saa716x);
-
+#if 0
 	err = saa716x_dump_eeprom(saa716x);
 	if (err) {
 		dprintk(SAA716x_ERROR, 1, "SAA716x EEPROM dump failed");
@@ -122,6 +131,9 @@ static int saa716x_budget_pci_probe(struct pci_dev *pdev, const struct pci_devic
 	SAA716x_EPWR(GREG, GREG_VI_CTRL, 0x04080FA9);
 	/* enable FGPI3 and FGPI1 for TS input from Port 2 and 6 */
 	SAA716x_EPWR(GREG, GREG_FGPI_CTRL, 0x321);
+#endif
+
+	saa716x_card_init(saa716x);
 
 	err = saa716x_dvb_init(saa716x);
 	if (err) {
