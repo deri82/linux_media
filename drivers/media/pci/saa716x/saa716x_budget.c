@@ -820,7 +820,7 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 			&tbs_isl6423_config);
 		break;
 	case 3:
-		/* second FE attaching */
+		/* forth FE attaching */
 		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[1],
 					&i2c0->i2c_adapter, init_fe);
 		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
