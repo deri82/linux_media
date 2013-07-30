@@ -52,12 +52,13 @@ MODULE_PARM_DESC(int_type, "force Interrupt Handler type: 0=INT-A, 1=MSI, 2=MSI-
 
 #define DRIVER_NAME	"SAA716x Budget"
 
+static struct dvb_frontend *init_fe;
 
 static int saa716x_card_init(struct saa716x_dev *saa716x)
 {
 
 
-
+	return 0;
 }
 
 
@@ -797,14 +798,34 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 	switch (count) {
 	case 0:
 		/* first FE attaching */
-		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
+		init_fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
 					&i2c1->i2c_adapter, NULL);
+		adapter->fe = init_fe;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
 			&tbs_isl6423_config);
 		break;
 	case 1:
+		/* second FE attaching */
+		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
+					&i2c1->i2c_adapter, init_fe);
+		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
+			&tbs_isl6423_config);
+		break;
 	case 2:
+		/* third FE attaching */
+		init_fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[1],
+					&i2c0->i2c_adapter, NULL);
+		adapter->fe = init_fe;
+		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
+			&tbs_isl6423_config);
+		break;
 	case 3:
+		/* second FE attaching */
+		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[1],
+					&i2c0->i2c_adapter, init_fe);
+		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
+			&tbs_isl6423_config);
+		break;
 	default:
 		break;
 	}
