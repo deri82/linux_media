@@ -801,6 +801,8 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		init_fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
 					&i2c1->i2c_adapter, NULL);
 		adapter->fe = init_fe;
+		if (adapter->fe == NULL)
+			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
 			&tbs_isl6423_config);
 		break;
@@ -808,6 +810,8 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		/* second FE attaching */
 		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[0],
 					&i2c1->i2c_adapter, init_fe);
+		if (adapter->fe == NULL)
+			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
 			&tbs_isl6423_config);
 		break;
@@ -816,6 +820,8 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		init_fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[1],
 					&i2c0->i2c_adapter, NULL);
 		adapter->fe = init_fe;
+		if (adapter->fe == NULL)
+			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
 			&tbs_isl6423_config);
 		break;
@@ -823,6 +829,8 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		/* forth FE attaching */
 		adapter->fe = dvb_attach(cx24117_attach, &tbs_cx24117_config[1],
 					&i2c0->i2c_adapter, init_fe);
+		if (adapter->fe == NULL)
+			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
 			&tbs_isl6423_config);
 		break;
@@ -835,6 +843,8 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 
 	return 0;
 exit:
+	printk("%s() failed attaching frontend %d\n",
+		__func__, count);
 	dprintk(SAA716x_ERROR, 1, "Frontend attach failed");
 	return -ENODEV;
 }
