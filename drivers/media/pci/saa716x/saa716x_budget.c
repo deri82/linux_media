@@ -174,6 +174,11 @@ static int saa716x_budget_pci_probe(struct pci_dev *pdev, const struct pci_devic
 	SAA716x_EPWR(GREG, GREG_FGPI_CTRL, 0x321);
 #endif
 
+	/* set default port mapping */
+	SAA716x_EPWR(GREG, GREG_VI_CTRL, 0x2C688F0A);
+	/* enable FGPI3, FGPI2, FGPI1 and FGPI0 for TS input from Port 2 and 6 */
+	SAA716x_EPWR(GREG, GREG_FGPI_CTRL, 0x322);
+
 	/* TODO: check if this is a TBS card to call this init code */
 	saa716x_card_init(saa716x);
 
