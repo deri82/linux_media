@@ -56,8 +56,48 @@ static struct dvb_frontend *init_fe;
 
 static int saa716x_card_init(struct saa716x_dev *saa716x)
 {
+	int i;
+	const u8 buf[] = {
+		0xe0, 0x06, 0x66, 0x33, 0x65,
+		0x01, 0x17, 0x06, 0xde};
 
+#define TBS_CK 7
+#define TBS_CS 8
+#define TBS_DT 11
 
+	/* send init bitstream through a bitbanged spi */
+	/* set pins as output */
+	saa716x_gpio_set_output(saa716x, TBS_CK);
+	saa716x_gpio_set_output(saa716x, TBS_CS);
+	saa716x_gpio_set_output(saa716x, TBS_DT);
+
+	/* set all pins high */
+	saa716x_gpio_write(saa716x, TBS_CK, 1);
+	saa716x_gpio_write(saa716x, TBS_CS, 1);
+	saa716x_gpio_write(saa716x, TBS_DT, 1);
+	msleep(20);
+
+	/* CS low */
+	saa716x_gpio_write(saa716x, TBS_CS, 0);
+	msleep(20);
+	/* send bitstream */
+	for (i = 0; i < 9 * 8; i++) {
+		/* clock low */
+		saa716x_gpio_write(saa716x, TBS_CK, 0);
+		msleep(20);
+		/* set data pin */
+		saa716x_gpio_write(saa716x, TBS_DT, 
+			((buf[i >> 3] >> (7 - (i & 7))) & 1));
+		/* clock high */
+		saa716x_gpio_write(saa716x, TBS_CK, 1);
+		msleep(20);
+	}
+	/* raise cs, clk and data */
+	saa716x_gpio_write(saa716x, TBS_CS, 1);
+	saa716x_gpio_write(saa716x, TBS_CK, 1);
+	saa716x_gpio_write(saa716x, TBS_DT, 1);
+	
+	/* done */
 	return 0;
 }
 
@@ -134,6 +174,7 @@ static int saa716x_budget_pci_probe(struct pci_dev *pdev, const struct pci_devic
 	SAA716x_EPWR(GREG, GREG_FGPI_CTRL, 0x321);
 #endif
 
+	/* TODO: check if this is a TBS card to call this init code */
 	saa716x_card_init(saa716x);
 
 	err = saa716x_dvb_init(saa716x);
