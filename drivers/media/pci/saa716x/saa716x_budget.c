@@ -948,6 +948,8 @@ static struct tda18212_config tda18212_config0 = {
 	.if_dvbt2_7 = 4000,
 	.if_dvbt2_8 = 4000,
 	.if_dvbc = 5000,
+	.loop_through = 1,
+	.xtout = 1
 };
 
 static struct tda18212_config tda18212_config1 = {
@@ -959,6 +961,8 @@ static struct tda18212_config tda18212_config1 = {
 	.if_dvbt2_7 = 4000,
 	.if_dvbt2_8 = 4000,
 	.if_dvbc = 5000,
+	.loop_through = 0,
+	.xtout = 0
 };
 
 static irqreturn_t saa716x_tbs6284_pci_irq(int irq, void *dev_id)
