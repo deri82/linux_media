@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/firmware.h>
 
+#include "tuner-i2c.h"
 #include "dvb_frontend.h"
 #include "cx24117.h"
 
@@ -134,36 +135,19 @@
 
 
 enum cmds {
-	/* aqcuisition */
-	CMD_SETVCOFREQ		= 0x10,
-	CMD_TUNEREQUEST		= 0x11,
-	CMD_MPEGCONFIGGLOBAL	= 0x13,
-	CMD_MPEGCONFIG		= 0x14,
-	CMD_TUNERINIT		= 0x15,
-	CMD_GETSAMPLERATE	= 0x18,
-	CMD_SETGOLDCODE		= 0x19,
-	CMD_GETAGCACC		= 0x1a,
-	CMD_DEMODINIT		= 0x1b,
-	CMD_GETCTLACC		= 0x1c,
-
-	/* lnb and diseqc */
-	CMD_LNBCONFIG		= 0x20,
-	CMD_LNBSENDDISEQC	= 0x21,
-	CMD_LNBSETDCLEVEL	= 0x22,
-	CMD_LNBPCBCONFIG	= 0x23,
-	CMD_LNBSENDTONEBURST	= 0x24,
-	CMD_LNBUPDATEREPLY	= 0x25,
-
-	/* utilities */
-	CMD_SETGPIOMODE		= 0x30,
-	CMD_SETGPIOENABLE	= 0x31,
-	CMD_SETGPIODIRECTION	= 0x32,
-	CMD_SETGPIOOUT		= 0x33,
-	CMD_ENABLERSERRORCORR	= 0x34,
-	CMD_FIRMWAREVERSION	= 0x35,
-	CMD_SETSLEEPMODE	= 0x36,
-	CMD_BERCONTROL		= 0x3c,
+	CMD_SET_VCO     = 0x10,
+	CMD_TUNEREQUEST = 0x11,
+	CMD_MPEGCONFIG  = 0x13,
+	CMD_TUNERINIT   = 0x14,
+	CMD_LNBSEND     = 0x21, /* Formerly CMD_SEND_DISEQC */
+	CMD_LNBDCLEVEL  = 0x22,
+	CMD_SET_TONE    = 0x23,
+	CMD_UPDFWVERS   = 0x35,
+	CMD_TUNERSLEEP  = 0x36,
 };
+
+static LIST_HEAD(hybrid_tuner_instance_list);
+static DEFINE_MUTEX(cx24117_list_mutex);
 
 /* The Demod/Tuner can't easily provide these, we cache them */
 struct cx24117_tuning {
@@ -196,9 +180,11 @@ struct cx24117_priv {
 	u8 demod_address;
 	struct i2c_adapter *i2c;
 	u8 skip_fw_load;
-
 	struct mutex fe_lock;
-	atomic_t fe_nr;
+
+	/* Used for sharing this struct between demods */
+	struct tuner_i2c_props i2c_props;
+	struct list_head hybrid_tuner_instance_list;
 };
 
 /* one per each fe */
@@ -518,8 +504,8 @@ static int cx24117_cmd_execute_nolock(struct dvb_frontend *fe,
 	cx24117_writereg(state, CX24117_REG_EXECUTE, 0x01);
 	i = 0;
 	while (cx24117_readreg(state, CX24117_REG_EXECUTE)) {
-		msleep(10);
-		if (i++ > 64) {
+		msleep(20);
+		if (i++ > 40) {
 			/* Avoid looping forever if the firmware does
 				not respond */
 			dev_warn(&state->priv->i2c->dev,
@@ -556,7 +542,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	dev_dbg(&state->priv->i2c->dev,
 		"%s() demod%d FW is %zu bytes (%02x %02x .. %02x %02x)\n",
 		__func__, state->demod, fw->size, fw->data[0], fw->data[1],
-		fw->data[fw->size-2], fw->data[fw->size-1]);
+		fw->data[fw->size - 2], fw->data[fw->size - 1]);
 
 	cx24117_writereg(state, 0xea, 0x00);
 	cx24117_writereg(state, 0xea, 0x01);
@@ -634,7 +620,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	cx24117_writereg(state, 0xe0, 0x00);
 
 	/* CMD 1B */
-	cmd.args[0] = CMD_DEMODINIT;
+	cmd.args[0] = 0x1b;
 	cmd.args[1] = 0x00;
 	cmd.args[2] = 0x01;
 	cmd.args[3] = 0x00;
@@ -644,7 +630,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 		goto error;
 
 	/* CMD 10 */
-	cmd.args[0] = CMD_SETVCOFREQ;
+	cmd.args[0] = CMD_SET_VCO;
 	cmd.args[1] = 0x06;
 	cmd.args[2] = 0x2b;
 	cmd.args[3] = 0xd8;
@@ -663,7 +649,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 		goto error;
 
 	/* CMD 15 */
-	cmd.args[0] = CMD_TUNERINIT;
+	cmd.args[0] = 0x15;
 	cmd.args[1] = 0x00;
 	cmd.args[2] = 0x01;
 	cmd.args[3] = 0x00;
@@ -682,7 +668,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 		goto error;
 
 	/* CMD 13 */
-	cmd.args[0] = CMD_MPEGCONFIGGLOBAL;
+	cmd.args[0] = CMD_MPEGCONFIG;
 	cmd.args[1] = 0x00;
 	cmd.args[2] = 0x00;
 	cmd.args[3] = 0x00;
@@ -695,7 +681,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 
 	/* CMD 14 */
 	for (i = 0; i < 2; i++) {
-		cmd.args[0] = CMD_MPEGCONFIG;
+		cmd.args[0] = CMD_TUNERINIT;
 		cmd.args[1] = (u8) i;
 		cmd.args[2] = 0x00;
 		cmd.args[3] = 0x05;
@@ -714,7 +700,7 @@ static int cx24117_load_firmware(struct dvb_frontend *fe,
 	cx24117_writereg(state, 0xe5, 0x04);
 
 	/* Firmware CMD 35: Get firmware version */
-	cmd.args[0] = CMD_FIRMWAREVERSION;
+	cmd.args[0] = CMD_UPDFWVERS;
 	cmd.len = 2;
 	for (i = 0; i < 4; i++) {
 		cmd.args[1] = i;
@@ -794,7 +780,7 @@ static int cx24117_read_signal_strength(struct dvb_frontend *fe,
 		CX24117_REG_SSTATUS0 : CX24117_REG_SSTATUS1;
 
 	/* Firmware CMD 1A */
-	cmd.args[0] = CMD_GETAGCACC;
+	cmd.args[0] = 0x1a;
 	cmd.args[1] = (u8) state->demod;
 	cmd.len = 2;
 	ret = cx24117_cmd_execute(fe, &cmd);
@@ -914,7 +900,7 @@ static int cx24117_set_voltage(struct dvb_frontend *fe,
 		"SEC_VOLTAGE_OFF");
 
 	/* CMD 32 */
-	cmd.args[0] = CMD_SETGPIODIRECTION;
+	cmd.args[0] = 0x32;
 	cmd.args[1] = reg;
 	cmd.args[2] = reg;
 	cmd.len = 3;
@@ -925,7 +911,7 @@ static int cx24117_set_voltage(struct dvb_frontend *fe,
 	if ((voltage == SEC_VOLTAGE_13) ||
 	    (voltage == SEC_VOLTAGE_18)) {
 		/* CMD 33 */
-		cmd.args[0] = CMD_SETGPIOOUT;
+		cmd.args[0] = 0x33;
 		cmd.args[1] = reg;
 		cmd.args[2] = reg;
 		cmd.len = 3;
@@ -940,16 +926,16 @@ static int cx24117_set_voltage(struct dvb_frontend *fe,
 		/* Wait for voltage/min repeat delay */
 		msleep(100);
 
-		/* CMD 22 - CMD_LNBSETDCLEVEL */
-		cmd.args[0] = CMD_LNBSETDCLEVEL;
+		/* CMD 22 - CMD_LNBDCLEVEL */
+		cmd.args[0] = CMD_LNBDCLEVEL;
 		cmd.args[1] = state->demod ? 0 : 1;
 		cmd.args[2] = (voltage == SEC_VOLTAGE_18 ? 0x01 : 0x00);
 		cmd.len = 3;
 
 		/* Min delay time before DiSEqC send */
-		msleep(15);
+		msleep(20);
 	} else {
-		cmd.args[0] = CMD_SETGPIOOUT;
+		cmd.args[0] = 0x33;
 		cmd.args[1] = 0x00;
 		cmd.args[2] = reg;
 		cmd.len = 3;
@@ -979,11 +965,11 @@ static int cx24117_set_tone(struct dvb_frontend *fe,
 		return ret;
 
 	/* Min delay time after DiSEqC send */
-	msleep(15);
+	msleep(20);
 
 	/* Set the tone */
-	/* CMD 23 - CMD_LNBPCBCONFIG */
-	cmd.args[0] = CMD_LNBPCBCONFIG;
+	/* CMD 23 - CMD_SET_TONE */
+	cmd.args[0] = CMD_SET_TONE;
 	cmd.args[1] = (state->demod ? 0 : 1);
 	cmd.args[2] = 0x00;
 	cmd.args[3] = 0x00;
@@ -997,7 +983,7 @@ static int cx24117_set_tone(struct dvb_frontend *fe,
 		break;
 	}
 
-	msleep(15);
+	msleep(20);
 
 	return cx24117_cmd_execute(fe, &cmd);
 }
@@ -1008,7 +994,7 @@ static int cx24117_diseqc_init(struct dvb_frontend *fe)
 	struct cx24117_state *state = fe->demodulator_priv;
 
 	/* Prepare a DiSEqC command */
-	state->dsec_cmd.args[0] = CMD_LNBSENDDISEQC;
+	state->dsec_cmd.args[0] = CMD_LNBSEND;
 
 	/* demod */
 	state->dsec_cmd.args[CX24117_DISEQC_DEMOD] = state->demod ? 0 : 1;
@@ -1136,37 +1122,64 @@ static int cx24117_diseqc_send_burst(struct dvb_frontend *fe,
 	return 0;
 }
 
+static int cx24117_get_priv(struct cx24117_priv **priv,
+	struct i2c_adapter *i2c, u8 client_address)
+{
+	int ret;
+
+	mutex_lock(&cx24117_list_mutex);
+	ret = hybrid_tuner_request_state(struct cx24117_priv, (*priv),
+		hybrid_tuner_instance_list, i2c, client_address, "cx24117");
+	mutex_unlock(&cx24117_list_mutex);
+
+	return ret;
+}
+
+static void cx24117_release_priv(struct cx24117_priv *priv)
+{
+	mutex_lock(&cx24117_list_mutex);
+	if (priv != NULL)
+		hybrid_tuner_release_state(priv);
+	mutex_unlock(&cx24117_list_mutex);
+}
+
 static void cx24117_release(struct dvb_frontend *fe)
 {
 	struct cx24117_state *state = fe->demodulator_priv;
 	dev_dbg(&state->priv->i2c->dev, "%s demod%d\n",
 		__func__, state->demod);
-	if (!atomic_dec_and_test(&state->priv->fe_nr))
-		kfree(state->priv);
+	cx24117_release_priv(state->priv);
 	kfree(state);
 }
 
 static struct dvb_frontend_ops cx24117_ops;
 
 struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
-	struct i2c_adapter *i2c, struct dvb_frontend *fe)
+	struct i2c_adapter *i2c)
 {
 	struct cx24117_state *state = NULL;
 	struct cx24117_priv *priv = NULL;
 	int demod = 0;
 
-	/* first frontend attaching */
-	/* allocate shared priv struct */
-	if (fe == NULL) {
-		priv = kzalloc(sizeof(struct cx24117_priv), GFP_KERNEL);
-		if (priv == NULL)
-			goto error1;
+	/* get the common data struct for both demods */
+	demod = cx24117_get_priv(&priv, i2c, config->demod_address);
+
+	switch (demod) {
+	case 0:
+		dev_err(&state->priv->i2c->dev,
+			"%s: Error attaching frontend %d\n",
+			KBUILD_MODNAME, demod);
+		goto error1;
+		break;
+	case 1:
+		/* new priv instance */
 		priv->i2c = i2c;
 		priv->demod_address = config->demod_address;
 		mutex_init(&priv->fe_lock);
-	} else {
-		demod = 1;
-		priv = ((struct cx24117_state *) fe->demodulator_priv)->priv;
+		break;
+	default:
+		/* existing priv instance */
+		break;
 	}
 
 	/* allocate memory for the internal state */
@@ -1174,7 +1187,7 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 	if (state == NULL)
 		goto error2;
 
-	state->demod = demod;
+	state->demod = demod - 1;
 	state->priv = priv;
 
 	/* test i2c bus for ack */
@@ -1183,12 +1196,9 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 			goto error3;
 	}
 
-	/* nr of frontends using the module */
-	atomic_inc(&priv->fe_nr);
-
 	dev_info(&state->priv->i2c->dev,
 		"%s: Attaching frontend %d\n",
-		KBUILD_MODNAME, demod);
+		KBUILD_MODNAME, state->demod);
 
 	/* create dvb_frontend */
 	memcpy(&state->frontend.ops, &cx24117_ops,
@@ -1199,7 +1209,7 @@ struct dvb_frontend *cx24117_attach(const struct cx24117_config *config,
 error3:
 	kfree(state);
 error2:
-	kfree(priv);
+	cx24117_release_priv(priv);
 error1:
 	return NULL;
 }
@@ -1222,37 +1232,36 @@ static int cx24117_initfe(struct dvb_frontend *fe)
 	mutex_lock(&state->priv->fe_lock);
 
 	/* Firmware CMD 36: Power config */
-	cmd.args[0] = CMD_SETSLEEPMODE;
+	cmd.args[0] = CMD_TUNERSLEEP;
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = 0;
 	cmd.len = 3;
 	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
-		return ret;
+		goto exit;
 
 	ret = cx24117_diseqc_init(fe);
 	if (ret != 0)
-		return ret;
+		goto exit;
 
 	/* CMD 3C */
-	cmd.args[0] = CMD_BERCONTROL;
+	cmd.args[0] = 0x3c;
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = 0x10;
 	cmd.args[3] = 0x10;
 	cmd.len = 4;
 	ret = cx24117_cmd_execute_nolock(fe, &cmd);
 	if (ret != 0)
-		return ret;
+		goto exit;
 
 	/* CMD 34 */
-	cmd.args[0] = CMD_ENABLERSERRORCORR;
+	cmd.args[0] = 0x34;
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = CX24117_OCC;
 	cmd.len = 3;
 	ret = cx24117_cmd_execute_nolock(fe, &cmd);
-	if (ret != 0)
-		return ret;
 
+exit:
 	mutex_unlock(&state->priv->fe_lock);
 
 	return ret;
@@ -1270,7 +1279,7 @@ static int cx24117_sleep(struct dvb_frontend *fe)
 		__func__, state->demod);
 
 	/* Firmware CMD 36: Power config */
-	cmd.args[0] = CMD_SETSLEEPMODE;
+	cmd.args[0] = CMD_TUNERSLEEP;
 	cmd.args[1] = (state->demod ? 1 : 0);
 	cmd.args[2] = 1;
 	cmd.len = 3;
@@ -1501,7 +1510,7 @@ static int cx24117_set_frontend(struct dvb_frontend *fe)
 					__func__, state->demod);
 				return 0;
 			}
-			msleep(10);
+			msleep(20);
 		}
 
 		dev_dbg(&state->priv->i2c->dev, "%s() demod%d not tuned\n",
@@ -1549,7 +1558,7 @@ static int cx24117_get_frontend(struct dvb_frontend *fe)
 
 	u8 buf[0x1f-4];
 
-	cmd.args[0] = CMD_GETCTLACC;
+	cmd.args[0] = 0x1c;
 	cmd.args[1] = (u8) state->demod;
 	cmd.len = 2;
 	ret = cx24117_cmd_execute(fe, &cmd);

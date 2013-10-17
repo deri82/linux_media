@@ -1041,38 +1041,33 @@ static void hauppauge_eeprom(struct cx23885_dev *dev, u8 *eeprom_data)
 			dev->name, tv.model);
 }
 
-/* TBS cards init */
+/* Some TBS cards require initing a chip using a bitbanged SPI attached
+   to the cx23885 gpio's. If this chip doesn't get init'ed the demod
+   doesn't respond to any command. */
 static void tbs_card_init(struct cx23885_dev *dev)
 {
 	int i;
 	const u8 buf[] = {
 		0xe0, 0x06, 0x66, 0x33, 0x65,
 		0x01, 0x17, 0x06, 0xde};
-	
+
 	switch (dev->board) {
 	case CX23885_BOARD_TBS_6980:
 	case CX23885_BOARD_TBS_6981:
 		cx_set(GP0_IO, 0x00070007);
-		msleep(1);
+		usleep_range(1000, 10000);
 		cx_clear(GP0_IO, 2);
-		msleep(1);
-		/* send init bitstream */
-		/* the bitstream is sent in a bitbanged spi */
-		/* attached to cx23995 GPIO port */
+		usleep_range(1000, 10000);
 		for (i = 0; i < 9 * 8; i++) {
 			cx_clear(GP0_IO, 7);
-			msleep(1);
+			usleep_range(1000, 10000);
 			cx_set(GP0_IO,
 				((buf[i >> 3] >> (7 - (i & 7))) & 1) | 4);
-			msleep(1);
+			usleep_range(1000, 10000);
 		}
 		cx_set(GP0_IO, 7);
 		break;
 	}
-
-	/* clear any pending audio ADC interrupts */
-	//cx23885_flatiron_write(dev, 0x1f, 0x80);
-	//cx23885_flatiron_write(dev, 0x23, 0x80);
 }
 
 int cx23885_tuner_callback(void *priv, int component, int command, int arg)
