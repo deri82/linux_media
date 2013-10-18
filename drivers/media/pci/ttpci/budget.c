@@ -680,7 +680,7 @@ static void frontend_init(struct budget *budget)
 					if (dvb_attach(isl6423_attach,
 						       budget->dvb_frontend,
 						       &budget->i2c_adap,
-						       &tt1600_isl6423_config) == NULL) {
+						       &tt1600_isl6423_config, 0) == NULL) {
 						printk(KERN_ERR "%s: No Intersil ISL6423 found!\n", __func__);
 						goto error_out;
 					}

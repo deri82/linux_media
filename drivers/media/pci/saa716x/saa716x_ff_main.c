@@ -1753,7 +1753,7 @@ static int saa716x_s26400_frontend_attach(struct saa716x_adapter *adapter, int c
 			dvb_attach(isl6423_attach,
 				   adapter->fe,
 				   i2c_adapter,
-				   &tt6400_isl6423_config[count]);
+				   &tt6400_isl6423_config[count], 0);
 
 		}
 	}
