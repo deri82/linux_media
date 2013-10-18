@@ -990,7 +990,7 @@ static int anysee_tuner_attach(struct dvb_usb_adapter *adap)
 		if (fe) {
 			/* attach LNB controller */
 			fe = dvb_attach(isl6423_attach, adap->fe[0],
-					&d->i2c_adap, &anysee_isl6423_config);
+					&d->i2c_adap, &anysee_isl6423_config, 0);
 		}
 
 		break;
