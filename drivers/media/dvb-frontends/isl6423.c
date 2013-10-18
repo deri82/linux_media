@@ -59,6 +59,7 @@ struct isl6423_dev {
 	const struct isl6423_config	*config;
 	struct i2c_adapter		*i2c;
 
+	u8 reg_2;
 	u8 reg_3;
 	u8 reg_4;
 
@@ -89,9 +90,9 @@ static int isl6423_set_modulation(struct dvb_frontend *fe)
 	struct isl6423_dev *isl6423		= (struct isl6423_dev *) fe->sec_priv;
 	const struct isl6423_config *config	= isl6423->config;
 	int err = 0;
-	u8 reg_2 = 0;
+	u8 reg_2 = isl6423->reg_2;
 
-	reg_2 = 0x01 << 5;
+	/* reg_2 = 0x01 << 5; */
 
 	if (config->mod_extern)
 		reg_2 |= (1 << 3);
@@ -108,6 +109,7 @@ exit:
 	return err;
 }
 
+#if 0
 static int isl6423_voltage_boost(struct dvb_frontend *fe, long arg)
 {
 	struct isl6423_dev *isl6423 = (struct isl6423_dev *) fe->sec_priv;
@@ -142,7 +144,7 @@ exit:
 	dprintk(FE_ERROR, 1, "I/O error <%d>", err);
 	return err;
 }
-
+#endif
 
 static int isl6423_set_voltage(struct dvb_frontend *fe,
 			       enum fe_sec_voltage voltage)
@@ -205,26 +207,27 @@ static int isl6423_set_current(struct dvb_frontend *fe)
 		/* 275mA */
 		/* ISELH = 0, ISELL = 0 */
 		reg_3 &= ~0x3;
+		reg_3 |= 0x04;
 		break;
 
 	case SEC_CURRENT_515m:
 		/* 515mA */
 		/* ISELH = 0, ISELL = 1 */
 		reg_3 &= ~0x2;
-		reg_3 |=  0x1;
+		reg_3 |=  0x1 | 0x04;
 		break;
 
 	case SEC_CURRENT_635m:
 		/* 635mA */
 		/* ISELH = 1, ISELL = 0 */
 		reg_3 &= ~0x1;
-		reg_3 |=  0x2;
+		reg_3 |=  0x2 | 0x04;
 		break;
 
 	case SEC_CURRENT_800m:
 		/* 800mA */
 		/* ISELH = 1, ISELL = 1 */
-		reg_3 |= 0x3;
+		reg_3 |= 0x3 | 0x04;
 		break;
 	}
 
@@ -266,7 +269,7 @@ static void isl6423_release(struct dvb_frontend *fe)
 
 struct dvb_frontend *isl6423_attach(struct dvb_frontend *fe,
 				    struct i2c_adapter *i2c,
-				    const struct isl6423_config *config)
+				    const struct isl6423_config *config, int nr)
 {
 	struct isl6423_dev *isl6423;
 
@@ -278,10 +281,17 @@ struct dvb_frontend *isl6423_attach(struct dvb_frontend *fe,
 	isl6423->i2c	= i2c;
 	fe->sec_priv	= isl6423;
 
+	isl6423->reg_2 = 0x01 << 5;
 	/* SR3H = 0, SR3M = 1, SR3L = 0 */
 	isl6423->reg_3 = 0x02 << 5;
 	/* SR4H = 0, SR4M = 1, SR4L = 1 */
 	isl6423->reg_4 = 0x03 << 5;
+
+	if (nr) {
+		isl6423->reg_2 |= 0x80;
+		isl6423->reg_3 |= 0x80;
+		isl6423->reg_4 |= 0x80;
+	}
 
 	if (isl6423_set_current(fe))
 		goto exit;
@@ -291,7 +301,7 @@ struct dvb_frontend *isl6423_attach(struct dvb_frontend *fe,
 
 	fe->ops.release_sec		= isl6423_release;
 	fe->ops.set_voltage		= isl6423_set_voltage;
-	fe->ops.enable_high_lnb_voltage = isl6423_voltage_boost;
+	fe->ops.enable_high_lnb_voltage = NULL; /*isl6423_voltage_boost;*/
 	isl6423->verbose		= verbose;
 
 	return fe;

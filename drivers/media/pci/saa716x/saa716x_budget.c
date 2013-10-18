@@ -848,7 +848,7 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		if (adapter->fe == NULL)
 			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c1->i2c_adapter,
-			&tbs_isl6423_config);
+			&tbs_isl6423_config, count);
 		break;
 	case 2:
 	case 3:
@@ -858,7 +858,7 @@ static int saa716x_tbs6984_frontend_attach(struct saa716x_adapter *adapter, int 
 		if (adapter->fe == NULL)
 			goto exit;
 		dvb_attach(isl6423_attach, adapter->fe, &i2c0->i2c_adapter,
-			&tbs_isl6423_config);
+			&tbs_isl6423_config, count - 2);
 		break;
 	default:
 		break;

@@ -47,12 +47,12 @@ struct isl6423_config {
 
 extern struct dvb_frontend *isl6423_attach(struct dvb_frontend *fe,
 					   struct i2c_adapter *i2c,
-					   const struct isl6423_config *config);
+					   const struct isl6423_config *config, int nr);
 
 #else
 static inline struct dvb_frontend *isl6423_attach(struct dvb_frontend *fe,
 						  struct i2c_adapter *i2c,
-						  const struct isl6423_config *config)
+						  const struct isl6423_config *config, int nr)
 {
 	printk(KERN_WARNING "%s: driver disabled by Kconfig\n", __func__);
 	return NULL;
